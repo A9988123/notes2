@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Secure Notes</title>
+
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4A90E2">
+
+
+<style>
+body { margin:0; font-family:-apple-system; background:#f5f5f5 }
+header { background:#4A90E2; color:white; padding:10px; text-align:center }
+main { padding:10px }
+button,input,textarea {
+  width:100%; padding:10px; margin-bottom:8px; font-size:16px;
+}
+.note-item { background:white; padding:8px; margin-bottom:4px; cursor:pointer }
+.note-item.locked::after { content:" 🔒"; }
+.note-item.active { background:#dbe9ff }
+</style>
+</head>
+
+<body>
+
+<header>🔐 加密離線筆記</header>
+
+<main>
+  <button onclick="newNote()">➕ 新筆記</button>
+
+  <div id="noteList"></div>
+  <hr>
+
+  <input id="password" type="password" placeholder="主密碼" />
+  <button onclick="encryptCurrent()">🔐 加密</button>
+  <button onclick="decryptCurrent(false)">🔓 解密（暫時）</button>
+  <button onclick="decryptCurrent(true)">🔓 解密並解除加密</button>
+
+  <hr>
+
+  <input id="title" placeholder="標題" />
+  <textarea id="content" rows="8" placeholder="內容"></textarea>
+</main>
+
+<script>
+/* ========= IndexedDB ========= */
+
+const DB_NAME="notesDB", STORE="notes";
+let db, currentId=null, decryptedCache={};
+
+function openDB(){
+  return new Promise(res=>{
+    const r=indexedDB.open(DB_NAME,1);
+    r.onupgradeneeded=e=>{
+      e.target.result.createObjectStore(STORE,{keyPath:"id"});
+    };
+    r.onsuccess=e=>{ db=e.target.result; res(); };
+  });
+}
+function tx(mode){ return db.transaction(STORE,mode).objectStore(STORE); }
+function save(note){ tx("readwrite").put(note); }
+function all(){ return new Promise(r=>{ const q=tx("readonly").getAll(); q.onsuccess=()=>r(q.result);}); }
+
+/* ========= Crypto ========= */
+
+async function keyFromPassword(pw,salt){
+  const enc=new TextEncoder();
+  const base=await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    {name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},
+    base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]
+  );
+}
+function rand(n){ return crypto.getRandomValues(new Uint8Array(n)); }
+async function encryptText(text,pw){
+  const iv=rand(12), salt=rand(16);
+  const key=await keyFromPassword(pw,salt);
+  const enc=new TextEncoder().encode(text);
+  const buf=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc);
+  return { iv:[...iv], salt:[...salt], data:[...new Uint8Array(buf)] };
+}
+async function decryptText(obj,pw){
+  const key=await keyFromPassword(pw,new Uint8Array(obj.salt));
+  const buf=await crypto.subtle.decrypt(
+    {name:"AES-GCM",iv:new Uint8Array(obj.iv)},
+    key,new Uint8Array(obj.data)
+  );
+  return new TextDecoder().decode(buf);
+}
+
+/* ========= UI ========= */
+
+const list=document.getElementById("noteList");
+const titleI=document.getElementById("title");
+const contentI=document.getElementById("content");
+const pwI=document.getElementById("password");
+
+function render(notes){
+  list.innerHTML="";
+  notes.forEach(n=>{
+    const d=document.createElement("div");
+    d.className="note-item"+(n.encrypted?" locked":"")+(n.id===currentId?" active":"");
+    d.textContent=n.title||"無標題";
+    d.onclick=()=>openNote(n);
+    list.appendChild(d);
+  });
+}
+async function openNote(n){
+  currentId=n.id;
+  titleI.value=n.title||"";
+  if(n.encrypted){
+    contentI.value="🔒 已加密";
+  }else{
+    contentI.value=n.content||"";
+  }
+  refresh();
+}
+function newNote(){
+  const n={id:Date.now().toString(),title:"",content:"",encrypted:false};
+  currentId=n.id; save(n); openNote(n);
+}
+function refresh(){ all().then(render); }
+
+/* ========= Save ========= */
+
+titleI.oninput=contentI.oninput=()=>{
+  if(!currentId) return;
+  all().then(ns=>{
+    const n=ns.find(x=>x.id===currentId);
+    if(!n||n.encrypted) return;
+    n.title=titleI.value;
+    n.content=contentI.value;
+    save(n); refresh();
+  });
+};
+
+/* ========= Encrypt / Decrypt ========= */
+
+async function encryptCurrent(){
+  if(!currentId||!pwI.value) return alert("請輸入密碼");
+  all().then(async ns=>{
+    const n=ns.find(x=>x.id===currentId);
+    const enc=await encryptText(n.content,pwI.value);
+    n.content=enc; n.encrypted=true;
+    save(n); openNote(n);
+  });
+}
+async function decryptCurrent(permanent){
+  if(!currentId||!pwI.value) return alert("請輸入密碼");
+  all().then(async ns=>{
+    const n=ns.find(x=>x.id===currentId);
+    try{
+      const txt=await decryptText(n.content,pwI.value);
+      if(permanent){
+        n.content=txt; n.encrypted=false; save(n);
+      }
+      contentI.value=txt;
+    }catch{ alert("密碼錯誤或資料毀損"); }
+  });
+}
+
+/* ========= Start ========= */
+
+openDB().then(refresh);
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+</script>
+
+</body>
+</html>
