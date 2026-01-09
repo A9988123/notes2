@@ -72,7 +72,14 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
 <script>
 
+  const redirect = sessionStorage.redirect;
+  if (redirect) {
+    sessionStorage.removeItem("redirect");
+    history.replaceState(null, "", redirect);
+  }
 
+
+  
 /* ===== Multi Select State ===== */
 let multiSelectMode = false;
 let selectedIds = new Set();
@@ -403,3 +410,4 @@ openDB().then(refresh);
 
 </body>
 </html>
+
