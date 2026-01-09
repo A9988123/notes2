@@ -1,175 +1,405 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Secure Notes</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>備忘錄</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#4A90E2">
 
-
 <style>
-body { margin:0; font-family:-apple-system; background:#f5f5f5 }
-header { background:#4A90E2; color:white; padding:10px; text-align:center }
-main { padding:10px }
-button,input,textarea {
-  width:100%; padding:10px; margin-bottom:8px; font-size:16px;
+body{margin:0;font-family:-apple-system;background:#f5f5f5}
+
+/* ===== Header ===== */
+header{padding:14px 16px 6px;font-size:28px;font-weight:600}
+
+/* ===== Search ===== */
+#searchBox{width:calc(100% - 20px);margin:0 10px 10px;padding:10px;font-size:16px;border-radius:10px;border:1px solid #ddd}
+
+/* ===== Notes ===== */
+.section-title{padding:8px 14px;font-size:13px;color:#777}
+.note-item{background:#fff;padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer}
+.note-item.pinned{background:#fff8dc}
+
+
+/* ✅ 加在這裡 */
+.note-item.selected{
+  background:#dbe9ff;
 }
-.note-item { background:white; padding:8px; margin-bottom:4px; cursor:pointer }
-.note-item.locked::after { content:" 🔒"; }
-.note-item.active { background:#dbe9ff }
+
+.note-title{font-size:16px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.note-sub{font-size:13px;color:#666;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ===== FAB ===== */
+#fab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;font-size:32px}
+
+/* ===== Context Menu ===== */
+#contextMenu{position:fixed;background:#fff;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.25);display:none;z-index:9999}
+#contextMenu div{padding:10px 14px;cursor:pointer}
+#contextMenu div:hover{background:#f0f0f0}
+
+/* ===== Editor ===== */
+#editor{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f5f5;flex-direction:column}
+#editorHeader{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#4A90E2;color:white}
+#editorContent{flex:1;padding:10px;display:flex;flex-direction:column}
+#editorContent input,#editorContent textarea{width:100%;padding:10px;margin-bottom:8px;font-size:16px;border-radius:10px;border:1px solid #ccc}
 </style>
 </head>
 
 <body>
 
-<header>🔐 加密離線筆記</header>
+<header>備忘錄</header>
+<input id="searchBox" placeholder="🔍 搜尋">
 
-<main>
-  <button onclick="newNote()">➕ 新筆記</button>
+<div id="noteList"></div>
+<button id="fab" onclick="newNote()">＋</button>
+<div id="contextMenu"></div>
 
-  <div id="noteList"></div>
-  <hr>
+<!-- ===== Editor ===== -->
+<div id="editor">
+  <div id="editorHeader">
+    <button onclick="closeEditor()">返回列表</button>
+    <button onclick="saveEditor()">存檔</button>
+  </div>
+  <div id="editorContent">
+    <input id="title" placeholder="標題">
+    <textarea id="content" rows="18" placeholder="內容"></textarea>
+  </div>
+</div>
 
-  <input id="password" type="password" placeholder="主密碼" />
-  <button onclick="encryptCurrent()">🔐 加密</button>
-  <button onclick="decryptCurrent(false)">🔓 解密（暫時）</button>
-  <button onclick="decryptCurrent(true)">🔓 解密並解除加密</button>
-
-  <hr>
-
-  <input id="title" placeholder="標題" />
-  <textarea id="content" rows="8" placeholder="內容"></textarea>
-</main>
+<input type="file" id="backupFile" style="display:none" accept=".json">
 
 <script>
-/* ========= IndexedDB ========= */
 
-const DB_NAME="notesDB", STORE="notes";
-let db, currentId=null, decryptedCache={};
 
-function openDB(){
-  return new Promise(res=>{
-    const r=indexedDB.open(DB_NAME,1);
-    r.onupgradeneeded=e=>{
-      e.target.result.createObjectStore(STORE,{keyPath:"id"});
-    };
-    r.onsuccess=e=>{ db=e.target.result; res(); };
-  });
-}
-function tx(mode){ return db.transaction(STORE,mode).objectStore(STORE); }
-function save(note){ tx("readwrite").put(note); }
-function all(){ return new Promise(r=>{ const q=tx("readonly").getAll(); q.onsuccess=()=>r(q.result);}); }
+/* ===== Multi Select State ===== */
+let multiSelectMode = false;
+let selectedIds = new Set();
 
-/* ========= Crypto ========= */
+/* ===== Swipe State ===== */
+let swipeStartX = 0;
+let swipingItem = null;
 
-async function keyFromPassword(pw,salt){
-  const enc=new TextEncoder();
-  const base=await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]);
-  return crypto.subtle.deriveKey(
-    {name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},
-    base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]
-  );
-}
-function rand(n){ return crypto.getRandomValues(new Uint8Array(n)); }
-async function encryptText(text,pw){
-  const iv=rand(12), salt=rand(16);
-  const key=await keyFromPassword(pw,salt);
-  const enc=new TextEncoder().encode(text);
-  const buf=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc);
-  return { iv:[...iv], salt:[...salt], data:[...new Uint8Array(buf)] };
-}
-async function decryptText(obj,pw){
-  const key=await keyFromPassword(pw,new Uint8Array(obj.salt));
-  const buf=await crypto.subtle.decrypt(
-    {name:"AES-GCM",iv:new Uint8Array(obj.iv)},
-    key,new Uint8Array(obj.data)
-  );
-  return new TextDecoder().decode(buf);
-}
 
-/* ========= UI ========= */
 
-const list=document.getElementById("noteList");
-const titleI=document.getElementById("title");
-const contentI=document.getElementById("content");
-const pwI=document.getElementById("password");
-
-function render(notes){
-  list.innerHTML="";
-  notes.forEach(n=>{
-    const d=document.createElement("div");
-    d.className="note-item"+(n.encrypted?" locked":"")+(n.id===currentId?" active":"");
-    d.textContent=n.title||"無標題";
-    d.onclick=()=>openNote(n);
-    list.appendChild(d);
-  });
-}
-async function openNote(n){
-  currentId=n.id;
-  titleI.value=n.title||"";
-  if(n.encrypted){
-    contentI.value="🔒 已加密";
-  }else{
-    contentI.value=n.content||"";
-  }
+function toggleSelect(id){
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
   refresh();
 }
-function newNote(){
-  const n={id:Date.now().toString(),title:"",content:"",encrypted:false};
-  currentId=n.id; save(n); openNote(n);
+
+function showMultiBar(){
+  document.getElementById("multiBar").style.display = "flex";
 }
-function refresh(){ all().then(render); }
 
-/* ========= Save ========= */
+function exitMultiSelect(){
+  multiSelectMode = false;
+  selectedIds.clear();
+  document.getElementById("multiBar").style.display = "none";
+  refresh();
+}
 
-titleI.oninput=contentI.oninput=()=>{
-  if(!currentId) return;
-  all().then(ns=>{
-    const n=ns.find(x=>x.id===currentId);
-    if(!n||n.encrypted) return;
-    n.title=titleI.value;
-    n.content=contentI.value;
-    save(n); refresh();
-  });
+async function multiDelete(){
+  if (!confirm(`刪除 ${selectedIds.size} 筆筆記？`)) return;
+  for (const id of selectedIds) {
+    tx("readwrite").delete(id);
+  }
+  exitMultiSelect();
+}
+
+async function multiExport(){
+  const ns = await all();
+  const notes = ns.filter(n => selectedIds.has(n.id));
+  const pw = prompt("輸入備份加密密碼");
+  if (!pw) return;
+
+  const out = {};
+  for (const n of notes) {
+    const txt = n.encrypted
+      ? await decryptText(n.content, prompt(`解密「${n.title}」的密碼`))
+      : n.content;
+    out[n.id] = {
+      title: n.title,
+      content: "enc:" + JSON.stringify(await encryptText(txt, pw)),
+      timestamp: n.timestamp
+    };
+  }
+
+  downloadFile(JSON.stringify(out, null, 2), "multi-notes-backup.json");
+  exitMultiSelect();
+}
+
+function deleteById(id){
+  if (!confirm("確定刪除？")) return;
+  tx("readwrite").delete(id);
+  refresh();
+}
+
+
+
+
+/* ========= IndexedDB ========= */
+const DB_NAME="notesDB",STORE="notes";
+let db,currentId=null;
+
+function openDB(){return new Promise(r=>{const q=indexedDB.open(DB_NAME,1);q.onupgradeneeded=e=>{e.target.result.createObjectStore(STORE,{keyPath:"id"});};q.onsuccess=e=>{db=e.target.result;r();};});}
+function tx(m){return db.transaction(STORE,m).objectStore(STORE);}
+function save(n){tx("readwrite").put(n);}
+function all(){return new Promise(r=>{const q=tx("readonly").getAll();q.onsuccess=()=>r(q.result);});}
+
+/* ========= Crypto ========= */
+async function keyFromPassword(pw,salt){
+ const enc=new TextEncoder();
+ const base=await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]);
+ return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+function rand(n){return crypto.getRandomValues(new Uint8Array(n));}
+async function encryptText(t,pw){
+ const iv=rand(12),salt=rand(16);
+ const key=await keyFromPassword(pw,salt);
+ const buf=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(t));
+ return{iv:[...iv],salt:[...salt],data:[...new Uint8Array(buf)]};
+}
+async function decryptText(o,pw){
+ const key=await keyFromPassword(pw,new Uint8Array(o.salt));
+ const buf=await crypto.subtle.decrypt({name:"AES-GCM",iv:new Uint8Array(o.iv)},key,new Uint8Array(o.data));
+ return new TextDecoder().decode(buf);
+}
+
+/* ========= Render ========= */
+const list=document.getElementById("noteList");
+async function refresh(){
+ const ns=await all();
+ list.innerHTML="";
+ const pinned=ns.filter(n=>n.pinned),normal=ns.filter(n=>!n.pinned);
+ if(pinned.length){list.innerHTML+=`<div class="section-title">已釘選</div>`;pinned.forEach(renderNote);}
+ normal.forEach(renderNote);
+}
+function renderNote(n){
+  if(!n.timestamp) n.timestamp = Date.now();
+
+  const lines = (typeof n.content === "string" ? n.content : "").split("\n");
+  const d = document.createElement("div");
+
+  d.className = "note-item" +
+    (n.pinned ? " pinned" : "") +
+    (multiSelectMode && selectedIds.has(n.id) ? " selected" : "");
+
+  d.innerHTML = `
+    <div class="note-title">${n.title || lines[0] || "無內容"}</div>
+    <div class="note-sub">
+      ${new Date(n.timestamp).toLocaleString()} ${lines.slice(1).join(" ")}
+    </div>
+  `;
+
+  /* ================= 左鍵 ================= */
+  d.onclick = () => {
+    if (multiSelectMode) {
+      toggleSelect(n.id);
+    } else {
+      openEditor(n);
+    }
+  };
+
+  /* ================= 中鍵（釘選） ================= */
+  d.onmousedown = e => {
+    if (e.button === 1 && !multiSelectMode) {
+      e.preventDefault();
+      n.pinned = !n.pinned;
+      save(n);
+      refresh();
+    }
+  };
+
+  /* ================= 右鍵（選單） ================= */
+  d.oncontextmenu = e => {
+    if (multiSelectMode) return;
+    e.preventDefault();
+    currentId = n.id;
+    showMenu(e.pageX, e.pageY);
+  };
+
+ /* ================= 長按進多選 ================= */
+let pressTimer;
+
+d.addEventListener("pointerdown", e => {
+  // ✅ 多選模式下，完全禁止 swipe / 長按
+  if (multiSelectMode) return;
+
+  swipeStartX = e.clientX;
+  swipingItem = d;
+
+  pressTimer = setTimeout(() => {
+    multiSelectMode = true;
+    toggleSelect(n.id);
+    showMultiBar();
+  }, 500);
+});
+
+
+/* ================= 左滑 ================= */
+d.addEventListener("pointermove", e => {
+  if (multiSelectMode || !swipingItem) return;
+
+  const dx = e.clientX - swipeStartX;
+  if (dx < 0) {
+    d.style.transform = `translateX(${dx}px)`;
+  }
+});
+
+/* ================= pointer up（合併版） ================= */
+d.addEventListener("pointerup", e => {
+  clearTimeout(pressTimer);
+
+  if (!multiSelectMode) {
+    const dx = e.clientX - swipeStartX;
+    if (dx < -120) {
+      deleteById(n.id);
+      return;
+    }
+  }
+
+  swipingItem = null;
+  d.style.transform = "";
+});
+
+
+
+  list.appendChild(d);
+}
+
+/* ========= Editor ========= */
+const editor=document.getElementById("editor");
+const titleI=document.getElementById("title");
+const contentI=document.getElementById("content");
+
+function openEditor(n){
+ currentId=n.id;
+ titleI.value=n.title||"";
+ contentI.value=n.encrypted?"🔒 已加密，請解密":(n.content||"");
+ contentI.disabled=!!n.encrypted;
+ editor.style.display="flex";
+}
+function closeEditor(){editor.style.display="none";}
+function saveEditor(){
+ if(!currentId)return;
+ all().then(ns=>{
+  const n=ns.find(x=>x.id===currentId);
+  if(!n||n.encrypted)return;
+  n.title=titleI.value;
+  n.content=contentI.value;
+  save(n);refresh();
+ });
+}
+
+/* ========= New ========= */
+function newNote(){
+ const n={id:Date.now().toString(),title:"",content:"",encrypted:false,pinned:false,timestamp:Date.now()};
+ save(n);openEditor(n);
+}
+
+/* ========= Context Menu ========= */
+const menu=document.getElementById("contextMenu");
+menu.innerHTML=`
+<div onclick="ctxEncrypt()">🔐 加密</div>
+<div onclick="ctxDecrypt(false)">🔓 解密（暫時）</div>
+<div onclick="ctxDecrypt(true)">🔓 解密並解除</div>
+<div onclick="exportSingleNote()">📤 匯出單筆</div>
+<div onclick="exportAllNotes()">📦 匯出全部</div>
+<div onclick="document.getElementById('backupFile').click()">📥 匯入</div>
+<div onclick="deleteCurrent()">🗑 刪除</div>`;
+function showMenu(x,y){menu.style.left=x+"px";menu.style.top=y+"px";menu.style.display="block";}
+document.body.onclick=()=>menu.style.display="none";
+
+/* ========= Encrypt / Decrypt (prompt) ========= */
+async function ctxEncrypt(){
+ const pw=prompt("請輸入加密密碼"); if(!pw)return;
+ const ns=await all(); const n=ns.find(x=>x.id===currentId);
+ n.content=await encryptText(n.content,pw); n.encrypted=true; save(n); refresh();
+}
+async function ctxDecrypt(permanent){
+ const pw=prompt("請輸入解密密碼"); if(!pw)return;
+ const ns=await all(); const n=ns.find(x=>x.id===currentId);
+ try{
+  const txt=await decryptText(n.content,pw);
+  if(permanent){n.content=txt;n.encrypted=false;save(n);refresh();}
+  else alert(txt);
+ }catch{alert("❌ 解密失敗");}
+}
+
+/* ========= Delete ========= */
+async function deleteCurrent(){
+ const ns=await all(); const n=ns.find(x=>x.id===currentId);
+ if(!confirm("確定刪除？"))return;
+ tx("readwrite").delete(n.id); refresh();
+}
+
+/* ========= Export / Import ========= */
+function downloadFile(c,f){
+ const b=new Blob([c],{type:"application/json"});
+ const u=URL.createObjectURL(b);
+ const a=document.createElement("a");a.href=u;a.download=f;
+ document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
+}
+
+async function exportSingleNote(){
+ const ns=await all(); const n=ns.find(x=>x.id===currentId);
+ let txt=n.content;
+ if(n.encrypted){const pw=prompt("輸入原密碼");txt=await decryptText(n.content,pw);}
+ const bpw=prompt("備份密碼"); if(!bpw)return;
+ const enc=await encryptText(txt,bpw);
+ downloadFile(JSON.stringify({title:n.title,content:"enc:"+JSON.stringify(enc)},null,2),`${n.title||"note"}.json`);
+}
+
+async function exportAllNotes(){
+ const ns=await all();
+ const upw=prompt("輸入原解密密碼"); const bpw=prompt("備份密碼");
+ const out={};
+ for(const n of ns){
+  let txt=n.content;
+  if(n.encrypted) txt=await decryptText(n.content,upw);
+  out[n.id]={title:n.title,content:"enc:"+JSON.stringify(await encryptText(txt,bpw)),timestamp:n.timestamp};
+ }
+ downloadFile(JSON.stringify(out,null,2),`notes-backup.json`);
+}
+
+document.getElementById("backupFile").onchange=async e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const pw=prompt("輸入備份密碼"); if(!pw)return;
+ const data=JSON.parse(await f.text());
+ if(data.content){
+  const t=await decryptText(JSON.parse(data.content.slice(4)),pw);
+  save({id:Date.now().toString(),title:data.title,content:t,encrypted:false,timestamp:Date.now()});
+ }else{
+  for(const k in data){
+   const t=await decryptText(JSON.parse(data[k].content.slice(4)),pw);
+   save({id:k,title:data[k].title,content:t,encrypted:false,timestamp:data[k].timestamp});
+  }
+ }
+ refresh();
 };
 
-/* ========= Encrypt / Decrypt ========= */
-
-async function encryptCurrent(){
-  if(!currentId||!pwI.value) return alert("請輸入密碼");
-  all().then(async ns=>{
-    const n=ns.find(x=>x.id===currentId);
-    const enc=await encryptText(n.content,pwI.value);
-    n.content=enc; n.encrypted=true;
-    save(n); openNote(n);
-  });
-}
-async function decryptCurrent(permanent){
-  if(!currentId||!pwI.value) return alert("請輸入密碼");
-  all().then(async ns=>{
-    const n=ns.find(x=>x.id===currentId);
-    try{
-      const txt=await decryptText(n.content,pwI.value);
-      if(permanent){
-        n.content=txt; n.encrypted=false; save(n);
-      }
-      contentI.value=txt;
-    }catch{ alert("密碼錯誤或資料毀損"); }
-  });
-}
-
-/* ========= Start ========= */
-
+/* ========= Init ========= */
 openDB().then(refresh);
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
-}
-
 </script>
+
+<div id="multiBar" style="
+  position:fixed;
+  bottom:0; left:0;
+  width:100%;
+  background:#fff;
+  border-top:1px solid #ddd;
+  display:none;
+  padding:10px;
+  justify-content:space-around;
+  z-index:9999;
+">
+  <button onclick="multiDelete()">🗑 刪除</button>
+  <button onclick="multiExport()">📤 匯出</button>
+  <button onclick="exitMultiSelect()">取消</button>
+</div>
+
 
 </body>
 </html>
