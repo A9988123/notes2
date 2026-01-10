@@ -11,6 +11,54 @@
 <style>
 body{margin:0;font-family:-apple-system;background:#f5f5f5}
 
+
+/* ===== Swipe Action Layer ===== */
+.note-wrapper{
+  position:relative;
+  overflow:hidden;
+}
+
+.note-actions{
+  position:absolute;
+  top:0; bottom:0;
+  display:flex;
+  align-items:center;
+  z-index:0;
+}
+
+.note-actions.left{
+  right:0;
+}
+
+.note-actions.right{
+  left:0;
+}
+
+.note-actions button{
+  height:100%;
+  width:60px;
+  border:none;
+  font-size:20px;
+  color:white;
+  cursor:pointer;
+}
+
+.note-actions .export{background:#5ac8fa;}
+.note-actions .folder{background:#c7c7cc;}
+.note-actions .delete{background:#ff3b30;}
+.note-actions .pin{background:#ffcc00;color:black;}
+
+.note-item{
+  position:relative;
+  z-index:1;
+  transition:transform .2s ease;
+  background:#fff;
+}
+
+
+
+
+
 /* ===== Header ===== */
 header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
@@ -167,75 +215,186 @@ async function decryptText(o,pw){
  return new TextDecoder().decode(buf);
 }
 
+
+
+function startOfDay(t) {
+  const d = new Date(t);
+  d.setHours(0,0,0,0);
+  return d.getTime();
+}
+
+function isToday(t) {
+  return startOfDay(t) === startOfDay(Date.now());
+}
+
+function isYesterday(t) {
+  const today = startOfDay(Date.now());
+  return startOfDay(t) === today - 86400000;
+}
+
+function daysAgo(t) {
+  return Math.floor((startOfDay(Date.now()) - startOfDay(t)) / 86400000);
+}
+
+
+
+
+
+
 /* ========= Render ========= */
 const list=document.getElementById("noteList");
-async function refresh(){
- const ns=await all();
- list.innerHTML="";
- const pinned=ns.filter(n=>n.pinned),normal=ns.filter(n=>!n.pinned);
- if(pinned.length){list.innerHTML+=`<div class="section-title">已釘選</div>`;pinned.forEach(renderNote);}
- normal.forEach(renderNote);
+
+async function refresh() {
+  const ns = await all();
+  list.innerHTML = "";
+
+  // ===== 釘選 =====
+  const pinned = ns.filter(n => n.pinned);
+  if (pinned.length) {
+    list.innerHTML += `<div class="section-title">已釘選</div>`;
+    pinned
+      .sort((a,b)=>b.timestamp-a.timestamp)
+      .forEach(renderNote);
+  }
+
+  // ===== 分群容器 =====
+  const today = [];
+  const yesterday = [];
+  const last7 = [];
+  const byYear = {};
+
+  ns.filter(n => !n.pinned).forEach(n => {
+    const d = daysAgo(n.timestamp);
+
+    if (isToday(n.timestamp)) today.push(n);
+    else if (isYesterday(n.timestamp)) yesterday.push(n);
+    else if (d < 7) last7.push(n);
+    else {
+      const y = new Date(n.timestamp).getFullYear();
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(n);
+    }
+  });
+
+  // ===== Render =====
+  function renderGroup(title, notes) {
+    if (!notes.length) return;
+    list.innerHTML += `<div class="section-title">${title}</div>`;
+    notes
+      .sort((a,b)=>b.timestamp-a.timestamp)
+      .forEach(renderNote);
+  }
+
+  renderGroup("今天", today);
+  renderGroup("昨天", yesterday);
+  renderGroup("過去 7 天", last7);
+
+  Object.keys(byYear)
+    .sort((a,b)=>b-a)
+    .forEach(y => renderGroup(`${y} 年`, byYear[y]));
 }
+
+
+
 function renderNote(n){
   if(!n.timestamp) n.timestamp = Date.now();
 
   const lines = (typeof n.content === "string" ? n.content : "").split("\n");
-  const d = document.createElement("div");
 
+  /* ===== wrapper ===== */
+  const wrap = document.createElement("div");
+  wrap.className = "note-wrapper";
+
+  /* ===== left actions ===== */
+  const left = document.createElement("div");
+  left.className = "note-actions left";
+  left.innerHTML = `
+    <button class="export">📤</button>
+    <button class="folder">📁</button>
+    <button class="delete">🗑</button>
+  `;
+
+  /* ===== right actions ===== */
+  const right = document.createElement("div");
+  right.className = "note-actions right";
+  right.innerHTML = `
+    <button class="pin">${n.pinned ? "📍" : "📌"}</button>
+  `;
+
+  /* ===== note item ===== */
+  const d = document.createElement("div");
   d.className = "note-item" +
     (n.pinned ? " pinned" : "") +
     (multiSelectMode && selectedIds.has(n.id) ? " selected" : "");
 
   d.innerHTML = `
-    <div class="note-title">${n.title || lines[0] || "無內容"}</div>
+    <div class="note-title">${lines[0] || "無內容"}</div>
     <div class="note-sub">
-      ${new Date(n.timestamp).toLocaleString()} ${lines.slice(1).join(" ")}
+      ${new Date(n.timestamp).toLocaleString()} ${lines[1] || ""}
     </div>
   `;
 
-  /* ================= 左鍵 ================= */
-  d.onclick = () => {
-    if (multiSelectMode) {
-      toggleSelect(n.id);
-    } else {
-      openEditor(n);
-    }
+  wrap.append(left, right, d);
+  list.appendChild(wrap);
+
+  /* ===== Action buttons ===== */
+  left.querySelector(".delete").onclick = () => deleteById(n.id);
+  left.querySelector(".export").onclick = () => exportSingleNote(n.id);
+  right.querySelector(".pin").onclick = () => {
+    n.pinned = !n.pinned;
+    save(n);
+    refresh();
   };
 
-  /* ================= 中鍵（釘選） ================= */
-  d.onmousedown = e => {
-    if (e.button === 1 && !multiSelectMode) {
-      e.preventDefault();
-      n.pinned = !n.pinned;
-      save(n);
-      refresh();
-    }
-  };
+  /* ===== Swipe Logic ===== */
+  let startX = 0;
+  let currentX = 0;
+  let locked = false;
 
-  /* ================= 右鍵（選單） ================= */
-  d.oncontextmenu = e => {
+  d.addEventListener("pointerdown", e => {
     if (multiSelectMode) return;
-    e.preventDefault();
-    currentId = n.id;
-    showMenu(e.pageX, e.pageY);
+    startX = e.clientX;
+    d.setPointerCapture(e.pointerId);
+  });
+
+  d.addEventListener("pointermove", e => {
+    if (multiSelectMode) return;
+
+    currentX = e.clientX - startX;
+    if (currentX < -180) currentX = -180;
+    if (currentX > 80) currentX = 80;
+
+    d.style.transform = `translateX(${currentX}px)`;
+  });
+
+  d.addEventListener("pointerup", () => {
+    if (currentX < -120) {
+      d.style.transform = "translateX(-180px)";
+      locked = true;
+    } else if (currentX > 60) {
+      d.style.transform = "translateX(80px)";
+      locked = true;
+    } else {
+      reset();
+    }
+  });
+
+  function reset(){
+    d.style.transform = "";
+    locked = false;
+  }
+
+  /* ===== 點擊本體 ===== */
+  d.onclick = () => {
+    if (locked || multiSelectMode) return;
+    openEditor(n);
   };
 
- /* ================= 長按進多選 ================= */
-let pressTimer;
-
-d.addEventListener("pointerdown", e => {
-  // ✅ 多選模式下，完全禁止 swipe / 長按
-  if (multiSelectMode) return;
-
-  swipeStartX = e.clientX;
-  swipingItem = d;
-
-  pressTimer = setTimeout(() => {
-    multiSelectMode = true;
-    toggleSelect(n.id);
-    showMultiBar();
-  }, 500);
-});
+  /* ===== 點外面收回 ===== */
+  document.body.addEventListener("click", e => {
+    if (!wrap.contains(e.target)) reset();
+  });
+}
 
 
 /* ================= 左滑 ================= */
