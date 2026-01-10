@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>備忘錄</title>
 
-<link rel="manifest" href="manifest-v2.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#4A90E2">
 
 <style>
@@ -72,14 +72,7 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
 <script>
 
-  const redirect = sessionStorage.redirect;
-  if (redirect) {
-    sessionStorage.removeItem("redirect");
-    history.replaceState(null, "", redirect);
-  }
 
-
-  
 /* ===== Multi Select State ===== */
 let multiSelectMode = false;
 let selectedIds = new Set();
@@ -410,5 +403,3 @@ openDB().then(refresh);
 
 </body>
 </html>
-
-
