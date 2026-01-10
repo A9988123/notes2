@@ -92,6 +92,51 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 #editorHeader{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#4A90E2;color:white}
 #editorContent{flex:1;padding:10px;display:flex;flex-direction:column}
 #editorContent input,#editorContent textarea{width:100%;padding:10px;margin-bottom:8px;font-size:16px;border-radius:10px;border:1px solid #ccc}
+
+
+/* ===== iOS Editor ===== */
+#editor{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#fff;
+  flex-direction:column;
+  z-index:10000;
+}
+
+#editorHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  border-bottom:1px solid #eee;
+  font-size:16px;
+}
+
+#editorHeader button{
+  background:none;
+  border:none;
+  color:#007aff;
+  font-size:16px;
+}
+
+#editorContent{
+  flex:1;
+  padding:16px;
+  overflow:auto;
+}
+
+#contentEditable{
+  outline:none;
+  font-size:17px;
+  line-height:1.6;
+  min-height:100%;
+  white-space:pre-wrap;
+}
+
+
+
+
 </style>
 </head>
 
@@ -104,17 +149,24 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 <button id="fab" onclick="newNote()">＋</button>
 <div id="contextMenu"></div>
 
-<!-- ===== Editor ===== -->
+<!-- ===== iOS Editor ===== -->
 <div id="editor">
   <div id="editorHeader">
-    <button onclick="closeEditor()">返回列表</button>
-    <button onclick="saveEditor()">存檔</button>
+    <button id="backBtn">〈 備忘錄</button>
+
+    <div style="display:flex;gap:10px;">
+      <button id="undoBtn">↶</button>
+      <button id="redoBtn">↷</button>
+      <button id="doneBtn">完成</button>
+    </div>
   </div>
+
   <div id="editorContent">
-    <input id="title" placeholder="標題">
-    <textarea id="content" rows="18" placeholder="內容"></textarea>
+    <div id="contentEditable" contenteditable="true"
+      placeholder="開始輸入…"></div>
   </div>
 </div>
+
 
 <input type="file" id="backupFile" style="display:none" accept=".json">
 
@@ -429,28 +481,58 @@ d.addEventListener("pointerup", e => {
 }
 
 /* ========= Editor ========= */
-const editor=document.getElementById("editor");
-const titleI=document.getElementById("title");
-const contentI=document.getElementById("content");
+
+const editor = document.getElementById("editor");
+const editorContent = document.getElementById("contentEditable");
 
 function openEditor(n){
- currentId=n.id;
- titleI.value=n.title||"";
- contentI.value=n.encrypted?"🔒 已加密，請解密":(n.content||"");
- contentI.disabled=!!n.encrypted;
- editor.style.display="flex";
+  currentId = n.id;
+
+  editorContent.innerText =
+    n.encrypted ? "🔒 已加密，請解密後查看" : (n.content || "");
+
+  editorContent.contentEditable = !n.encrypted;
+
+  editor.style.display = "flex";
+  document.body.style.overflow = "hidden"; // iOS 感
 }
-function closeEditor(){editor.style.display="none";}
+
+
+/* ========= 返回列表（不存）========= */
+document.getElementById("backBtn").onclick = () => {
+  closeEditor(false);
+};
+
+function closeEditor(save){
+  if(save) saveEditor();
+  editor.style.display = "none";
+  document.body.style.overflow = "";
+}
+
+
+/* ========= 完成（存檔）========= */
+document.getElementById("doneBtn").onclick = () => {
+  closeEditor(true);
+};
+
+
+/* ========= 存檔邏輯（取代舊的）========= */
 function saveEditor(){
- if(!currentId)return;
- all().then(ns=>{
-  const n=ns.find(x=>x.id===currentId);
-  if(!n||n.encrypted)return;
-  n.title=titleI.value;
-  n.content=contentI.value;
-  save(n);refresh();
- });
+  if(!currentId) return;
+
+  all().then(ns=>{
+    const n = ns.find(x=>x.id===currentId);
+    if(!n || n.encrypted) return;
+
+    n.content = editorContent.innerText;
+    n.timestamp = Date.now();
+
+    save(n);
+    refresh();
+  });
 }
+
+
 
 /* ========= New ========= */
 function newNote(){
