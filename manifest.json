@@ -1,7 +1,7 @@
 {
   "name": "Secure Notes",
   "short_name": "Notes",
-  "start_url": "notes2.html",
+  "start_url": "notes2",
   "display": "standalone",
   "background_color": "#4A90E2",
   "theme_color": "#4A90E2",
@@ -13,3 +13,4 @@
     }
   ]
 }
+
