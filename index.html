@@ -11,99 +11,6 @@
 <style>
 body{margin:0;font-family:-apple-system;background:#f5f5f5}
 
-#fab{
-  position:fixed;
-  right:18px;
-  bottom:18px;
-  width:56px;
-  height:56px;
-  border-radius:50%;
-  font-size:32px;
-  z-index:2000;       /* ⭐ 關鍵 */
-}
-
-
-
-
-.note-actions.right .pin{
-  transition: transform .2s ease, background .2s ease;
-}
-
-.note-actions.right.active .pin{
-  transform: scale(1.25);
-  background:#ffd60a;
-}
-
-
-
-
-
-
-/* ===== Swipe Action Layer ===== */
-.note-wrapper{
-  position:relative;
-  overflow:hidden;
-}
-
-.note-actions{
-  position:absolute;
-  top:0; bottom:0;
-  display:flex;
-  align-items:center;
-  z-index:0;
-}
-
-.note-actions.left{
-  right:0;
-}
-
-.note-actions.right{
-  left:0;
-}
-
-.note-actions button{
-  height:100%;
-  width:60px;
-  border:none;
-  font-size:20px;
-  color:white;
-  cursor:pointer;
-}
-
-.note-actions .export{background:#5ac8fa;}
-.note-actions .folder{background:#c7c7cc;}
-.note-actions .delete{background:#ff3b30;}
-.note-actions .pin{background:#ffcc00;color:black;}
-
-.note-item{
-  position:relative;
-  z-index:1;
-  transition:transform .2s ease;
-  background:#fff;
-}
-
-
-
-.check-item{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:17px;
-}
-.check-item span{
-  outline:none;
-}
-
-
-.note-img{
-  max-width:100%;
-  border-radius:10px;
-  margin:8px 0;
-}
-
-
-
-
 /* ===== Header ===== */
 header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
@@ -112,15 +19,8 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
 /* ===== Notes ===== */
 .section-title{padding:8px 14px;font-size:13px;color:#777}
-.note-item{background:#fff;padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer}
+.note-item{background:#fff;padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;touch-action:pan-y;}
 .note-item.pinned{background:#fff8dc}
-
-
-/* ✅ 加在這裡 */
-.note-item.selected{
-  background:#dbe9ff;
-}
-
 .note-title{font-size:16px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .note-sub{font-size:13px;color:#666;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 
@@ -133,85 +33,13 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 #contextMenu div:hover{background:#f0f0f0}
 
 /* ===== Editor ===== */
-#editor{
-  display:none;
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:#f5f5f5;
-  flex-direction:column;
-  z-index:3000;      /* 編輯時才在最上 */
-}
-
+#editor{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f5f5;flex-direction:column}
 #editorHeader{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#4A90E2;color:white}
+#editorToolbar{display:flex;padding:6px 10px;background:#eee;gap:6px;flex-wrap:wrap}
+#editorToolbar button{padding:6px 10px;border:none;border-radius:6px;background:white;cursor:pointer;font-weight:bold;}
+#editorToolbar button:hover{background:#ddd;}
 #editorContent{flex:1;padding:10px;display:flex;flex-direction:column}
-#editorContent input,#editorContent textarea{width:100%;padding:10px;margin-bottom:8px;font-size:16px;border-radius:10px;border:1px solid #ccc}
-
-
-/* ===== iOS Editor ===== */
-#editor{
-  display:none;
-  position:fixed;
-  inset:0;
-  background:#fff;
-  flex-direction:column;
-  z-index:10000;
-}
-
-#editorHeader{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:10px;
-  border-bottom:1px solid #eee;
-  font-size:16px;
-}
-
-#editorHeader button{
-  background:none;
-  border:none;
-  color:#007aff;
-  font-size:16px;
-}
-
-#editorContent{
-  flex:1;
-  padding:16px;
-  overflow:auto;
-}
-
-#contentEditable{
-  outline:none;
-  font-size:17px;
-  line-height:1.6;
-  min-height:100%;
-  white-space:pre-wrap;
-}
-
-
-
-/* ===== iOS Editor Toolbar ===== */
-#editorToolbar{
-  display:flex;
-  justify-content:space-around;
-  align-items:center;
-  padding:8px 6px;
-  border-top:1px solid #ddd;
-  background:#fff;
-}
-
-#editorToolbar button{
-  font-size:22px;
-  background:none;
-  border:none;
-  cursor:pointer;
-}
-
-
-
-
+#editorContent input,#editorContent textarea{width:100%;padding:10px;margin-bottom:8px;font-size:16px;border-radius:10px;border:1px solid #ccc;resize:none;}
 </style>
 </head>
 
@@ -224,114 +52,29 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 <button id="fab" onclick="newNote()">＋</button>
 <div id="contextMenu"></div>
 
-<!-- ===== iOS Editor ===== -->
+<!-- ===== Editor ===== -->
 <div id="editor">
   <div id="editorHeader">
-    <button id="backBtn">〈 備忘錄</button>
-
-    <div style="display:flex;gap:10px;">
-      <button id="undoBtn">↶</button>
-      <button id="redoBtn">↷</button>
-      <button id="doneBtn">完成</button>
-    </div>
+    <button onclick="closeEditor()">返回列表</button>
+    <button onclick="saveEditor()">存檔</button>
   </div>
-
-
-<!-- ===== Editor Toolbar ===== -->
-<div id="editorToolbar">
-  <button onclick="insertChecklist()">☑️</button>
-  <button onclick="insertBold()">𝗕</button>
-  <button onclick="insertImage()">📷</button>
-  <button onclick="insertAttachment()">📎</button>
+  <div id="editorToolbar">
+    <button onclick="formatText('bold')">B</button>
+    <button onclick="formatText('italic')">I</button>
+    <button onclick="formatText('underline')">U</button>
+    <button onclick="insertTable()">表格</button>
+    <button onclick="insertImage()">圖片</button>
+    <button onclick="insertVideo()">影片</button>
+  </div>
+  <div id="editorContent">
+    <input id="title" placeholder="標題">
+    <textarea id="content" rows="18" placeholder="內容"></textarea>
+  </div>
 </div>
-
-
-<div id="editorContent">
-  <div id="contentEditable" contenteditable="true"></div>
-</div>
-
-
 
 <input type="file" id="backupFile" style="display:none" accept=".json">
 
 <script>
-
-
-
-function haptic(){
-  if (navigator.vibrate) navigator.vibrate(15);
-}
-
-
-
-
-
-/* ===== Multi Select State ===== */
-let multiSelectMode = false;
-let selectedIds = new Set();
-
-/* ===== Swipe State ===== */
-let swipeStartX = 0;
-let swipingItem = null;
-
-
-
-function toggleSelect(id){
-  if (selectedIds.has(id)) selectedIds.delete(id);
-  else selectedIds.add(id);
-  refresh();
-}
-
-function showMultiBar(){
-  document.getElementById("multiBar").style.display = "flex";
-}
-
-function exitMultiSelect(){
-  multiSelectMode = false;
-  selectedIds.clear();
-  document.getElementById("multiBar").style.display = "none";
-  refresh();
-}
-
-async function multiDelete(){
-  if (!confirm(`刪除 ${selectedIds.size} 筆筆記？`)) return;
-  for (const id of selectedIds) {
-    tx("readwrite").delete(id);
-  }
-  exitMultiSelect();
-}
-
-async function multiExport(){
-  const ns = await all();
-  const notes = ns.filter(n => selectedIds.has(n.id));
-  const pw = prompt("輸入備份加密密碼");
-  if (!pw) return;
-
-  const out = {};
-  for (const n of notes) {
-    const txt = n.encrypted
-      ? await decryptText(n.content, prompt(`解密「${n.title}」的密碼`))
-      : n.content;
-    out[n.id] = {
-      title: n.title,
-      content: "enc:" + JSON.stringify(await encryptText(txt, pw)),
-      timestamp: n.timestamp
-    };
-  }
-
-  downloadFile(JSON.stringify(out, null, 2), "multi-notes-backup.json");
-  exitMultiSelect();
-}
-
-function deleteById(id){
-  if (!confirm("確定刪除？")) return;
-  tx("readwrite").delete(id);
-  refresh();
-}
-
-
-
-
 /* ========= IndexedDB ========= */
 const DB_NAME="notesDB",STORE="notes";
 let db,currentId=null;
@@ -360,389 +103,98 @@ async function decryptText(o,pw){
  return new TextDecoder().decode(buf);
 }
 
-
-
-function startOfDay(t) {
-  const d = new Date(t);
-  d.setHours(0,0,0,0);
-  return d.getTime();
-}
-
-function isToday(t) {
-  return startOfDay(t) === startOfDay(Date.now());
-}
-
-function isYesterday(t) {
-  const today = startOfDay(Date.now());
-  return startOfDay(t) === today - 86400000;
-}
-
-function daysAgo(t) {
-  return Math.floor((startOfDay(Date.now()) - startOfDay(t)) / 86400000);
-}
-
-
-
-
-
-
 /* ========= Render ========= */
 const list=document.getElementById("noteList");
-
-async function refresh() {
-  const ns = await all();
-  list.innerHTML = "";
-
-  // ===== 釘選 =====
-  const pinned = ns.filter(n => n.pinned);
-  if (pinned.length) {
-    list.innerHTML += `<div class="section-title">已釘選</div>`;
-    pinned
-      .sort((a,b)=>b.timestamp-a.timestamp)
-      .forEach(renderNote);
-  }
-
-  // ===== 分群容器 =====
-  const today = [];
-  const yesterday = [];
-  const last7 = [];
-  const byYear = {};
-
-  ns.filter(n => !n.pinned).forEach(n => {
-    const d = daysAgo(n.timestamp);
-
-    if (isToday(n.timestamp)) today.push(n);
-    else if (isYesterday(n.timestamp)) yesterday.push(n);
-    else if (d < 7) last7.push(n);
-    else {
-      const y = new Date(n.timestamp).getFullYear();
-      if (!byYear[y]) byYear[y] = [];
-      byYear[y].push(n);
-    }
-  });
-
-  // ===== Render =====
-  function renderGroup(title, notes) {
-    if (!notes.length) return;
-    list.innerHTML += `<div class="section-title">${title}</div>`;
-    notes
-      .sort((a,b)=>b.timestamp-a.timestamp)
-      .forEach(renderNote);
-  }
-
-  renderGroup("今天", today);
-  renderGroup("昨天", yesterday);
-  renderGroup("過去 7 天", last7);
-
-  Object.keys(byYear)
-    .sort((a,b)=>b-a)
-    .forEach(y => renderGroup(`${y} 年`, byYear[y]));
+async function refresh(){
+ const ns=await all();
+ list.innerHTML="";
+ const pinned=ns.filter(n=>n.pinned),normal=ns.filter(n=>!n.pinned);
+ if(pinned.length){list.innerHTML+=`<div class="section-title">已釘選</div>`;pinned.forEach(renderNote);}
+ normal.forEach(renderNote);
 }
 
-
+/* ========= Render with Drag & Drop ========= */
 function renderNote(n){
-  if(!n.timestamp) n.timestamp = Date.now();
-  const lines = (n.content || "").replace(/<[^>]+>/g,"").split("\n");
+ if(!n.timestamp)n.timestamp=Date.now();
+ const lines=(typeof n.content==="string"?n.content:"").split("\n");
+ const d=document.createElement("div");
+ d.className="note-item"+(n.pinned?" pinned":"");
+ d.draggable = true; // 啟用拖曳
+ d.innerHTML=`<div class="note-title">${n.title||lines[0]||"無內容"}</div>
+ <div class="note-sub">${new Date(n.timestamp).toLocaleString()} ${lines.slice(1).join(" ")}</div>`;
+ d.onclick=()=>openEditor(n);
+ d.onmousedown=e=>{if(e.button===1){e.preventDefault();n.pinned=!n.pinned;save(n);refresh();}};
+ d.oncontextmenu=e=>{e.preventDefault();currentId=n.id;showMenu(e.pageX,e.pageY);};
+ list.appendChild(d);
 
-  /* ===== Wrapper ===== */
-  const wrap = document.createElement("div");
-  wrap.className = "note-wrapper";
+ addSwipeListeners(d,n); // 左右滑功能
+ addDragListeners(d,n);   // 拖曳功能
+}
 
-  /* ===== Left Actions（右滑顯示：釘選） ===== */
-  const rightActions = document.createElement("div");
-  rightActions.className = "note-actions right";
-  rightActions.innerHTML = `
-    <button class="pin">${n.pinned ? "📍" : "📌"}</button>
-  `;
-
-  /* ===== Right Actions（左滑顯示） ===== */
-  const leftActions = document.createElement("div");
-  leftActions.className = "note-actions left";
-  leftActions.innerHTML = `
-    <button class="export">📤</button>
-    <button class="folder">📁</button>
-    <button class="delete">🗑</button>
-  `;
-
-  /* ===== Note Item ===== */
-  const item = document.createElement("div");
-  item.className =
-    "note-item" +
-    (n.pinned ? " pinned" : "") +
-    (multiSelectMode && selectedIds.has(n.id) ? " selected" : "");
-
-  item.innerHTML = `
-    <div class="note-title">${lines[0] || "無內容"}</div>
-    <div class="note-sub">
-      ${new Date(n.timestamp).toLocaleString()} ${lines[1] || ""}
-    </div>
-  `;
-
-  wrap.append(leftActions, rightActions, item);
-  list.appendChild(wrap);
-
-  /* ===== Action Buttons ===== */
-  leftActions.querySelector(".delete").onclick = () => deleteById(n.id);
-  leftActions.querySelector(".export").onclick = () => {
-    currentId = n.id;
-    exportSingleNote();
-  };
-  rightActions.querySelector(".pin").onclick = () => {
-    n.pinned = !n.pinned;
-    save(n);
-    refresh();
-  };
-
-  /* ================= Swipe Logic（iOS 核心） ================= */
-  let startX = 0;
-  let dx = 0;
-  let opened = false;
-
-  const MAX_LEFT = -180; // 左滑最大
-  const MAX_RIGHT = 80;  // 右滑最大
-
-  item.addEventListener("pointerdown", e => {
-    if (multiSelectMode) return;
-    startX = e.clientX;
-    item.setPointerCapture(e.pointerId);
+/* ========= Drag & Drop ========= */
+function addDragListeners(item,note){
+  item.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/plain', note.id);
+    item.style.opacity = 0.5;
   });
-
-  item.addEventListener("pointermove", e => {
-    if (multiSelectMode) return;
-
-    dx = e.clientX - startX;
-
-    if (dx < MAX_LEFT) dx = MAX_LEFT;
-    if (dx > MAX_RIGHT) dx = MAX_RIGHT;
-
-    item.style.transform = `translateX(${dx}px)`;
+  item.addEventListener('dragend', e=>{
+    item.style.opacity = 1;
   });
-
-
-item.addEventListener("pointerup", () => {
-
-  /* ===== 左滑段位（只展開，不立即執行） ===== */
-  if (dx < -120) {
-    item.style.transform = "translateX(-180px)";
-    opened = true;
-    return;
-  }
-
-  /* ===== 右滑段位（立即釘選） ===== */
-  if (dx > 60) {
-    // 視覺高亮
-    rightActions.classList.add("active");
-
-    // 震動
-    haptic();
-
-    // 切換釘選
-    n.pinned = !n.pinned;
-    save(n);
-
-    // 短暫停留 → 收回 → refresh
-    setTimeout(() => {
-      rightActions.classList.remove("active");
-      item.style.transform = "";
-      opened = false;
+  item.addEventListener('dragover', e=>{
+    e.preventDefault(); // 允許 drop
+  });
+  item.addEventListener('drop', e=>{
+    e.preventDefault();
+    const draggedId = e.dataTransfer.getData('text/plain');
+    if(draggedId === note.id) return;
+    all().then(ns=>{
+      const draggedNote = ns.find(x=>x.id===draggedId);
+      if(!draggedNote) return;
+      // 移動 draggedNote 到 note 的前面
+      const newOrder = ns.filter(x=>x.id!==draggedId);
+      const index = newOrder.findIndex(x=>x.id===note.id);
+      newOrder.splice(index,0,draggedNote);
+      // 依順序重新保存 timestamp，以控制顯示順序
+      newOrder.forEach((x,i)=>{ x.timestamp = Date.now() + i; save(x); });
       refresh();
-    }, 220);
-
-    return;
-  }
-
-  /* ===== 不成立 → 回彈 ===== */
-  reset();
-});
-
-
-
-  function reset(){
-    item.style.transform = "";
-    opened = false;
-  }
-
-  /* ===== 點擊筆記本體 ===== */
-  item.onclick = () => {
-    if (opened || multiSelectMode) return;
-    openEditor(n);
-  };
-
-  /* ===== 點擊其他地方自動收回 ===== */
-  document.body.addEventListener("click", e => {
-    if (!wrap.contains(e.target)) reset();
+    });
   });
 }
+
+
 
 
 
 
 /* ========= Editor ========= */
-const editor = document.getElementById("editor");
-const contentEditable = document.getElementById("contentEditable");
+const editor=document.getElementById("editor");
+const titleI=document.getElementById("title");
+const contentI=document.getElementById("content");
 
 function openEditor(n){
-  currentId = n.id;
-
-  contentEditable.innerHTML =
-    n.encrypted ? "🔒 已加密，請解密後查看" : (n.content || "");
-
-  contentEditable.contentEditable = !n.encrypted;
-
-  editor.style.display = "flex";
-  document.body.style.overflow = "hidden";
-
-  // 游標放到最後（iOS 感）
-  placeCursorAtEnd(contentEditable);
+ currentId=n.id;
+ titleI.value=n.title||"";
+ contentI.value=n.encrypted?"🔒 已加密，請解密":(n.content||"");
+ contentI.disabled=!!n.encrypted;
+ editor.style.display="flex";
 }
-
-
-
-
-/* 返回（不存） */
-document.getElementById("backBtn").onclick = () => {
-  closeEditor(false);
-};
-
-/* 完成（存檔） */
-document.getElementById("doneBtn").onclick = () => {
-  closeEditor(true);
-};
-
-function closeEditor(save){
-  if(save) saveEditor();
-  editor.style.display = "none";
-  document.body.style.overflow = "";
-}
-
-/* 存檔 */
+function closeEditor(){editor.style.display="none";}
 function saveEditor(){
-  if(!currentId) return;
-
-  all().then(ns=>{
-    const n = ns.find(x=>x.id===currentId);
-    if(!n || n.encrypted) return;
-
-    n.content = contentEditable.innerHTML;
-    n.timestamp = Date.now();
-
-    save(n);
-    refresh();
-  });
+ if(!currentId)return;
+ all().then(ns=>{
+  const n=ns.find(x=>x.id===currentId);
+  if(!n||n.encrypted)return;
+  n.title=titleI.value;
+  n.content=contentI.value;
+  save(n);refresh();
+ });
 }
 
-
-
-
-
-
-
-/* 將游標放到最後 */
-function placeCursorAtEnd(el){
-  el.focus();
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  range.collapse(false);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-/* 完成存檔 */
-doneBtn.onclick = () => {
-  saveEditor();
-  editor.style.display = "none";
-  document.body.style.overflow = "";
-};
-
-
-
-
-/* ========= New Note ========= */
+/* ========= New ========= */
 function newNote(){
-  const n = {
-    id: Date.now().toString(),
-    content: "",
-    encrypted: false,
-    pinned: false,
-    timestamp: Date.now()
-  };
-
-  save(n);
-  currentId = n.id;
-  openEditor(n);
+ const n={id:Date.now().toString(),title:"",content:"",encrypted:false,pinned:false,timestamp:Date.now()};
+ save(n);openEditor(n);
 }
-
-
-
-
-
-/* ========= iOS Editor Toolbar 插入功能 ========= */
-
-/* 插入文字或符號到游標 */
-function insertAtCursor(text){
-  contentEditable.focus();
-  document.execCommand("insertText", false, text);
-}
-
-/* 插入核取清單 */
-function insertChecklist(){
-  contentEditable.focus();
-  document.execCommand(
-    "insertHTML",
-    false,
-    `<div class="check-item">☐ <span contenteditable="true">&nbsp;</span></div>`
-  );
-}
-
-
-/* 插入粗體文字（Markdown） */
-function insertBold(){
-  contentEditable.focus();
-  document.execCommand("bold");
-}
-
-/* 插入圖片（base64 demo） */
-function insertImage(){
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "image/*";
-
-  input.onchange = () => {
-    const file = input.files[0];
-    if(!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      contentEditable.focus();
-      document.execCommand(
-        "insertHTML",
-        false,
-        `<img src="${reader.result}" class="note-img">`
-      );
-    };
-    reader.readAsDataURL(file);
-  };
-
-  input.click();
-}
-
-
-/* 插入附件（暫時提示） */
-function insertAttachment(){
-  alert("📎 附加檔案功能（下一步可完成）");
-}
-
-/* toolbar HTML（已經在你的 editor 裡） */
-// <div id="editorToolbar">
-//   <button onclick="insertChecklist()">☑️</button>
-//   <button onclick="insertBold()">𝗕</button>
-//   <button onclick="insertImage()">📷</button>
-//   <button onclick="insertAttachment()">📎</button>
-// </div>
-
-
-
 
 /* ========= Context Menu ========= */
 const menu=document.getElementById("contextMenu");
@@ -825,26 +277,60 @@ document.getElementById("backupFile").onchange=async e=>{
  refresh();
 };
 
+/* ========= Editor Toolbar Functions ========= */
+function formatText(cmd){
+  const textarea = contentI;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = textarea.value.slice(start, end);
+  let wrapped;
+  if(cmd === 'bold') wrapped = `**${selected}**`;
+  else if(cmd === 'italic') wrapped = `*${selected}*`;
+  else if(cmd === 'underline') wrapped = `__${selected}__`;
+  textarea.setRangeText(wrapped, start, end, 'end');
+}
+
+function insertTable(){
+  const textarea = contentI;
+  const table = `|  |  |\n|--|--|\n|  |  |\n`;
+  const pos = textarea.selectionStart;
+  textarea.setRangeText(table, pos, pos, 'end');
+}
+
+function insertImage(){
+  const url = prompt("輸入圖片 URL");
+  if(url) contentI.setRangeText(`![圖片](${url})`, contentI.selectionStart, contentI.selectionEnd, 'end');
+}
+
+function insertVideo(){
+  const url = prompt("輸入影片 URL");
+  if(url) contentI.setRangeText(`<video src="${url}" controls></video>`, contentI.selectionStart, contentI.selectionEnd, 'end');
+}
+
+/* ========= Swipe Gestures ========= */
+function addSwipeListeners(item,note){
+  let startX=null, moved=false;
+  item.addEventListener('pointerdown', e=>{ startX=e.clientX; });
+  item.addEventListener('pointermove', e=>{
+    if(startX === null) return;
+    const dx = e.clientX - startX;
+    if(Math.abs(dx) > 50) moved=true;
+  });
+  item.addEventListener('pointerup', e=>{
+    if(!moved) return;
+    const dx = e.clientX - startX;
+    if(dx < -50){ // 左滑刪除
+      if(confirm("刪除此筆備忘錄？")){ tx('readwrite').delete(note.id); refresh(); }
+    } else if(dx > 50){ // 右滑釘選/取消
+      note.pinned = !note.pinned; save(note); refresh();
+    }
+    startX=null; moved=false;
+  });
+}
+
 /* ========= Init ========= */
 openDB().then(refresh);
 </script>
-
-<div id="multiBar" style="
-  position:fixed;
-  bottom:0; left:0;
-  width:100%;
-  background:#fff;
-  border-top:1px solid #ddd;
-  display:none;
-  padding:10px;
-  justify-content:space-around;
-  z-index:9999;
-">
-  <button onclick="multiDelete()">🗑 刪除</button>
-  <button onclick="multiExport()">📤 匯出</button>
-  <button onclick="exitMultiSelect()">取消</button>
-</div>
-
 
 </body>
 </html>
