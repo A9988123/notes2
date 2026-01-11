@@ -19,7 +19,11 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
 /* ===== Notes ===== */
 .section-title{padding:8px 14px;font-size:13px;color:#777}
-.note-item{background:#fff;padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer;position:relative;touch-action:pan-y;}
+.note-item{
+  touch-action: pan-y;      /* 只允許上下滑 */
+  overscroll-behavior: contain;
+}
+
 .note-item.pinned{background:#fff8dc}
 .note-title{font-size:16px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .note-sub{font-size:13px;color:#666;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
@@ -45,7 +49,11 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
 <body>
 
-<header>備忘錄</header>
+<header style="display:flex;justify-content:space-between;align-items:center;">
+  <span>備忘錄</span>
+  <button onclick="toggleTopMenu(event)">⋯</button>
+</header>
+
 <input id="searchBox" placeholder="🔍 搜尋">
 
 <div id="noteList"></div>
@@ -71,6 +79,22 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
     <textarea id="content" rows="18" placeholder="內容"></textarea>
   </div>
 </div>
+
+
+
+<div id="topMenu" style="
+  position:fixed;
+  top:60px;
+  right:10px;
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,.25);
+  display:none;
+  z-index:9999;">
+</div>
+
+
+
 
 <input type="file" id="backupFile" style="display:none" accept=".json">
 
@@ -196,18 +220,50 @@ function newNote(){
  save(n);openEditor(n);
 }
 
-/* ========= Context Menu ========= */
-const menu=document.getElementById("contextMenu");
-menu.innerHTML=`
+/* ========= Context / Top Menu 共用內容 ========= */
+const menuHTML = `
 <div onclick="ctxEncrypt()">🔐 加密</div>
 <div onclick="ctxDecrypt(false)">🔓 解密（暫時）</div>
 <div onclick="ctxDecrypt(true)">🔓 解密並解除</div>
 <div onclick="exportSingleNote()">📤 匯出單筆</div>
 <div onclick="exportAllNotes()">📦 匯出全部</div>
 <div onclick="document.getElementById('backupFile').click()">📥 匯入</div>
-<div onclick="deleteCurrent()">🗑 刪除</div>`;
-function showMenu(x,y){menu.style.left=x+"px";menu.style.top=y+"px";menu.style.display="block";}
-document.body.onclick=()=>menu.style.display="none";
+<div onclick="deleteCurrent()">🗑 刪除</div>
+`;
+
+
+/* ========= Context Menu ========= */
+const menu = document.getElementById("contextMenu");
+const topMenu = document.getElementById("topMenu");
+
+menu.innerHTML = menuHTML;
+topMenu.innerHTML = menuHTML;
+
+
+function showMenu(x,y){
+  menu.style.left = x + "px";
+  menu.style.top  = y + "px";
+  menu.style.display = "block";
+}
+
+function toggleTopMenu(e){
+  e.stopPropagation(); // 🔥 關鍵
+  topMenu.style.display =
+    topMenu.style.display === "block" ? "none" : "block";
+}
+
+
+
+document.body.addEventListener('click', e=>{
+  const clickInContextMenu = e.target.closest('#contextMenu');
+  const clickInTopMenu     = e.target.closest('#topMenu');
+  const clickInHeader      = e.target.closest('header');
+
+  if(!clickInContextMenu && !clickInTopMenu && !clickInHeader){
+    menu.style.display = "none";
+    topMenu.style.display = "none";
+  }
+});
 
 /* ========= Encrypt / Decrypt (prompt) ========= */
 async function ctxEncrypt(){
@@ -308,25 +364,48 @@ function insertVideo(){
 }
 
 /* ========= Swipe Gestures ========= */
-function addSwipeListeners(item,note){
-  let startX=null, moved=false;
-  item.addEventListener('pointerdown', e=>{ startX=e.clientX; });
+function addSwipeListeners(item, note){
+  let startX = null;
+  let dx = 0;
+  const THRESHOLD = 120; // 🔥 滑動門檻（px）
+
+  item.addEventListener('pointerdown', e=>{
+    startX = e.clientX;
+    dx = 0;
+    item.setPointerCapture(e.pointerId);
+  });
+
   item.addEventListener('pointermove', e=>{
     if(startX === null) return;
-    const dx = e.clientX - startX;
-    if(Math.abs(dx) > 50) moved=true;
+    dx = e.clientX - startX;
+
+    // ❌ 不讓列表真的跟著移動（畫面固定）
+    e.preventDefault();
   });
+
   item.addEventListener('pointerup', e=>{
-    if(!moved) return;
-    const dx = e.clientX - startX;
-    if(dx < -50){ // 左滑刪除
-      if(confirm("刪除此筆備忘錄？")){ tx('readwrite').delete(note.id); refresh(); }
-    } else if(dx > 50){ // 右滑釘選/取消
-      note.pinned = !note.pinned; save(note); refresh();
+    item.releasePointerCapture(e.pointerId);
+
+    if(Math.abs(dx) >= THRESHOLD){
+      if(dx < 0){
+        // ⬅ 左滑：刪除
+        if(confirm("刪除此筆備忘錄？")){
+          tx('readwrite').delete(note.id);
+          refresh();
+        }
+      }else{
+        // ➡ 右滑：釘選 / 取消釘選
+        note.pinned = !note.pinned;
+        save(note);
+        refresh();
+      }
     }
-    startX=null; moved=false;
+
+    startX = null;
+    dx = 0;
   });
 }
+
 
 /* ========= Init ========= */
 openDB().then(refresh);
