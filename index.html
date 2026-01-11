@@ -28,6 +28,26 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 .note-title{font-size:16px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .note-sub{font-size:13px;color:#666;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 
+.note-item{
+  position:relative;
+  background:white;
+}
+.note-item::after{
+  content:"🗑 刪除";
+  position:absolute;
+  right:14px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:18px;
+  color:#d33;
+  display:none;
+}
+.note-item.show-delete::after{
+  display:block;
+}
+
+
+
 /* ===== FAB ===== */
 #fab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;font-size:32px}
 
@@ -44,6 +64,23 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 #editorToolbar button:hover{background:#ddd;}
 #editorContent{flex:1;padding:10px;display:flex;flex-direction:column}
 #editorContent input,#editorContent textarea{width:100%;padding:10px;margin-bottom:8px;font-size:16px;border-radius:10px;border:1px solid #ccc;resize:none;}
+/* ===== Editor Swipe Hint ===== */
+#editorSwipeHint{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  display:none;
+  align-items:center;
+  justify-content:flex-start;
+  padding-left:20px;
+  font-size:22px;
+  font-weight:600;
+  color:#4A90E2;
+  background:rgba(245,245,245,.85);
+  z-index:9998;
+  pointer-events:none;
+}
+
 </style>
 </head>
 
@@ -80,6 +117,8 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
   </div>
 </div>
 
+<!-- ✅ 就放在這裡 -->
+<div id="editorSwipeHint">⬅ 返回列表</div>
 
 
 <div id="topMenu" style="
@@ -364,47 +403,87 @@ function insertVideo(){
 }
 
 /* ========= Swipe Gestures ========= */
-function addSwipeListeners(item, note){
-  let startX = null;
-  let dx = 0;
-  const THRESHOLD = 120; // 🔥 滑動門檻（px）
+function addSwipeListeners(item,note){
+  let sx=null, dx=0;
+  const TH=120;
 
-  item.addEventListener('pointerdown', e=>{
-    startX = e.clientX;
-    dx = 0;
+  item.addEventListener("pointerdown",e=>{
+    sx=e.clientX; dx=0;
     item.setPointerCapture(e.pointerId);
   });
 
-  item.addEventListener('pointermove', e=>{
-    if(startX === null) return;
-    dx = e.clientX - startX;
+  item.addEventListener("pointermove",e=>{
+    if(sx===null) return;
+    dx=e.clientX-sx;
 
-    // ❌ 不讓列表真的跟著移動（畫面固定）
-    e.preventDefault();
+    if(dx< -30){
+      item.classList.add("show-delete");
+      e.preventDefault();
+    }
   });
 
-  item.addEventListener('pointerup', e=>{
+  item.addEventListener("pointerup",e=>{
     item.releasePointerCapture(e.pointerId);
 
-    if(Math.abs(dx) >= THRESHOLD){
-      if(dx < 0){
-        // ⬅ 左滑：刪除
-        if(confirm("刪除此筆備忘錄？")){
-          tx('readwrite').delete(note.id);
-          refresh();
-        }
-      }else{
-        // ➡ 右滑：釘選 / 取消釘選
-        note.pinned = !note.pinned;
-        save(note);
+    if(dx<-TH){
+      if(confirm("刪除此筆備忘錄？")){
+        tx("readwrite").delete(note.id);
         refresh();
       }
     }
 
-    startX = null;
-    dx = 0;
+    item.classList.remove("show-delete");
+    sx=null; dx=0;
   });
 }
+
+/* ========= Editor Swipe Back (Safe Version) ========= */
+(()=>{
+  let sx=null, dx=0;
+  const hint=document.getElementById("editorSwipeHint");
+  const TH=120;
+  const EDGE=20; // 🔥 只有左邊 20px 才啟動返回
+
+  editor.addEventListener("pointerdown",e=>{
+    // ❌ 點在按鈕 / input / textarea 不處理
+    if(e.target.closest("button,input,textarea")) return;
+
+    // ❌ 不是從左邊緣開始，不處理
+    if(e.clientX > EDGE) return;
+
+    sx=e.clientX;
+    dx=0;
+    editor.setPointerCapture(e.pointerId);
+  });
+
+  editor.addEventListener("pointermove",e=>{
+    if(sx===null) return;
+    dx=e.clientX-sx;
+
+    if(dx>30){
+      hint.style.display="flex";
+      e.preventDefault();
+    }
+  });
+
+  editor.addEventListener("pointerup",e=>{
+    if(sx!==null){
+      editor.releasePointerCapture(e.pointerId);
+    }
+
+    hint.style.display="none";
+
+    if(dx>TH){
+      closeEditor();
+    }
+
+    sx=null;
+    dx=0;
+  });
+
+})();
+
+
 
 
 /* ========= Init ========= */
