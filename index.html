@@ -176,9 +176,10 @@ html, body {
     <button onclick="insertImage()">圖片</button>
     <button onclick="insertVideo()">影片</button>
   </div>
-  <div id="editorContent">
-    <textarea id="content" rows="20" placeholder="開始輸入…"></textarea>
-  </div>
+<div id="editorContent">
+  <div id="content" contenteditable="true" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:10px; overflow:auto;" placeholder="開始輸入…"></div>
+</div>
+
 </div>
 
 <!-- ✅ 就放在這裡 -->
@@ -200,6 +201,9 @@ html, body {
 
 
 <input type="file" id="backupFile" style="display:none" accept=".json">
+
+<input type="file" id="imgPicker" accept="image/*" hidden>
+
 
 <script>
 /* ========= IndexedDB ========= */
@@ -230,15 +234,6 @@ async function decryptText(o,pw){
  return new TextDecoder().decode(buf);
 }
 
-/* ========= Render ========= */
-const list=document.getElementById("noteList");
-async function refresh(){
- const ns=await all();
- list.innerHTML="";
- const pinned=ns.filter(n=>n.pinned),normal=ns.filter(n=>!n.pinned);
- if(pinned.length){list.innerHTML+=`<div class="section-title">已釘選</div>`;pinned.forEach(renderNote);}
- normal.forEach(renderNote);
-}
 
 /* ========= 
 ✅ iOS 兩行顯示
@@ -253,7 +248,37 @@ async function refresh(){
 
 ========= */
 
-function renderNote(n){
+/* ========= Render ========= */
+const list=document.getElementById("noteList");
+
+
+// 全域搜尋框
+const searchInput = document.getElementById("searchBox");
+
+// 高亮函式
+function highlight(text, keyword){
+  if(!keyword) return text;
+  const re = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")})`, "gi");
+  return text.replace(re, '<mark>$1</mark>');
+}
+
+// 刷新列表時，將關鍵字帶入
+async function refresh(){
+  const q = searchInput.value.trim().toLowerCase();
+  const ns = await all();
+  list.innerHTML = "";
+  const pinned = ns.filter(n => n.pinned);
+  const normal = ns.filter(n => !n.pinned);
+  if(pinned.length){
+    list.innerHTML += `<div class="section-title">已釘選</div>`;
+    pinned.forEach(n => renderNote(n, q));
+  }
+  normal.forEach(n => renderNote(n, q));
+}
+
+
+// renderNote 改成接收關鍵字
+function renderNote(n, keyword = ""){
   if(!n.timestamp) n.timestamp = Date.now();
 
   const text = typeof n.content === "string" ? n.content : "";
@@ -262,6 +287,10 @@ function renderNote(n){
   let first = text.replace(/\n/g," ");
   let display1 = first.slice(0, 20);
   let display2 = first.slice(20);
+
+  // 高亮關鍵字
+  display1 = highlight(display1, keyword);
+  display2 = highlight(display2, keyword);
 
   const d = document.createElement("div");
   d.className = "note-item" + (n.pinned ? " pinned" : "");
@@ -291,7 +320,6 @@ function renderNote(n){
 
 
 
-
 /* ========= Editor ========= */
 const editor=document.getElementById("editor");
 const contentI=document.getElementById("content");
@@ -299,19 +327,22 @@ const contentI=document.getElementById("content");
 
 /* ========= 打開編輯器時只顯示內容 ========= */
 function openEditor(n){
- currentId = n.id;
- contentI.value = n.encrypted
-   ? "🔒 已加密，請解密"
-   : (n.content || "");
- contentI.disabled = !!n.encrypted;
+  currentId = n.id;
+  if(n.encrypted){
+    contentI.innerHTML = "🔒 已加密，請解密";
+    contentI.contentEditable = false;
+  } else {
+    contentI.innerHTML = n.content || "";
+    contentI.contentEditable = true;
+  }
 
- // 🔥 關鍵：隱藏列表與 FAB
- document.getElementById("noteList").style.display = "none";
- document.getElementById("fab").style.display = "none";
- document.getElementById("searchBox").style.display = "none";
+  document.getElementById("noteList").style.display = "none";
+  document.getElementById("fab").style.display = "none";
+  document.getElementById("searchBox").style.display = "none";
 
- editor.style.display = "flex";
+  editor.style.display = "flex";
 }
+
 
 
 function closeEditor(){
@@ -326,22 +357,24 @@ function closeEditor(){
 
 /* ========= 存檔時自動拆第一行當標題 ========= */
 function saveEditor(){
- if(!currentId) return;
+  if(!currentId) return;
 
- all().then(ns=>{
-  const n = ns.find(x=>x.id===currentId);
-  if(!n || n.encrypted) return;
+  all().then(ns=>{
+    const n = ns.find(x=>x.id===currentId);
+    if(!n || n.encrypted) return;
 
-  const text = contentI.value.trim();
-  const lines = text.split("\n");
+    const html = contentI.innerHTML;  // ✅ 抓取 contenteditable HTML
+    const text = contentI.innerText.trim(); // 可拆第一行當標題
+    const lines = text.split("\n");
 
-  n.title = lines[0] || "";
-  n.content = text;
+    n.title = lines[0] || "";
+    n.content = html;  // ✅ 存 HTML 而不是 value
 
-  save(n);
-  refresh();
- });
+    save(n);
+    refresh();
+  });
 }
+
 
 
 /* ========= New ========= */
@@ -465,16 +498,10 @@ document.getElementById("backupFile").onchange=async e=>{
 
 /* ========= Editor Toolbar Functions ========= */
 function formatText(cmd){
-  const textarea = contentI;
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const selected = textarea.value.slice(start, end);
-  let wrapped;
-  if(cmd === 'bold') wrapped = `**${selected}**`;
-  else if(cmd === 'italic') wrapped = `*${selected}*`;
-  else if(cmd === 'underline') wrapped = `__${selected}__`;
-  textarea.setRangeText(wrapped, start, end, 'end');
+  document.execCommand(cmd, false, null);
 }
+
+
 
 function insertTable(){
   const textarea = contentI;
@@ -483,57 +510,145 @@ function insertTable(){
   textarea.setRangeText(table, pos, pos, 'end');
 }
 
+
+
+
+/* ========= 插入圖片 ========= */
 function insertImage(){
-  const url = prompt("輸入圖片 URL");
-  if(url) contentI.setRangeText(`![圖片](${url})`, contentI.selectionStart, contentI.selectionEnd, 'end');
+  document.getElementById("imgPicker").click();
 }
 
+imgPicker.onchange = e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = document.createElement("img");
+    img.src = reader.result;
+    img.style.maxWidth = "100%";
+    img.style.display = "block";
+    img.style.margin = "5px 0";
+
+    const sel = window.getSelection();
+    if(!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    range.insertNode(img);
+    range.collapse(false);
+
+    const br = document.createElement("br");
+    range.insertNode(br);
+  };
+  reader.readAsDataURL(file);
+};
+
+
+
+/* ========= 插入影片 ========= */
 function insertVideo(){
-  const url = prompt("輸入影片 URL");
-  if(url) contentI.setRangeText(`<video src="${url}" controls></video>`, contentI.selectionStart, contentI.selectionEnd, 'end');
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "video/*";
+  input.click();
+
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const video = document.createElement("video");
+      video.src = reader.result;
+      video.controls = true;
+      video.style.maxWidth = "100%";
+      video.style.display = "block";
+      video.style.margin = "5px 0";
+
+      const sel = window.getSelection();
+      if(!sel.rangeCount) return;
+
+      const range = sel.getRangeAt(0);
+      range.insertNode(video);
+      range.collapse(false);
+
+      const br = document.createElement("br");
+      range.insertNode(br);
+    };
+    reader.readAsDataURL(file);
+  };
 }
+
 
 /* ========= 左右滑完整邏輯 ========= */
-function addSwipeListeners(item,note){
-  let sx=null, dx=0;
+function addSwipeListeners(item, note){
+  let sx = null, dx = 0;
   const main = item.querySelector(".note-main");
+  const deleteBtn = item.querySelector(".swipe-bg.delete");
+  const pinBtn = item.querySelector(".swipe-bg.pin");
 
-  item.addEventListener("pointerdown",e=>{
+  // 禁止滑動點擊冒泡
+  function stopClick(e){ e.stopPropagation(); }
+
+  item.addEventListener("pointerdown", e => {
     sx = e.clientX;
     item.setPointerCapture(e.pointerId);
+    main.style.transition = "none";
   });
 
-  item.addEventListener("pointermove",e=>{
-    if(sx===null) return;
+  item.addEventListener("pointermove", e => {
+    if(sx === null) return;
     dx = e.clientX - sx;
 
-    if(dx < 0){
-      main.style.transform = `translateX(${Math.max(dx,-120)}px)`;
-    }else{
-      main.style.transform = `translateX(${Math.min(dx,120)}px)`;
+    // 阻止左右誤觸點擊打開編輯器
+    if(Math.abs(dx) > 5) main.dataset.dragging = true;
+
+    // 左右滑動
+    if(dx < 0){ // 左滑 → 顯示刪除
+      main.style.transform = `translateX(${Math.max(dx, -120)}px)`;
+    } else { // 右滑 → 顯示釘選
+      main.style.transform = `translateX(${Math.min(dx, 120)}px)`;
     }
   });
 
-  item.addEventListener("pointerup",e=>{
+  item.addEventListener("pointerup", e => {
     item.releasePointerCapture(e.pointerId);
+    main.style.transition = "transform .25s ease";
 
-    // 左滑定住
-    if(dx < -60){
+    if(dx < -60){ // 左滑超過閾值 → 定住
       main.style.transform = "translateX(-120px)";
-      return;
-    }
-
-    // 右滑定住
-    if(dx > 60){
+    } else if(dx > 60){ // 右滑超過閾值 → 定住
       main.style.transform = "translateX(120px)";
-      return;
+    } else { // 回彈
+      main.style.transform = "translateX(0)";
     }
 
-    // 回彈
-    main.style.transform = "translateX(0)";
-    sx=null; dx=0;
+    // 重置拖曳標記
+    setTimeout(()=>{ delete main.dataset.dragging; }, 50);
+
+    sx = null; dx = 0;
+  });
+
+  // 點擊刪除按鈕
+  deleteBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    tx("readwrite").delete(note.id);
+    refresh();
+  });
+
+  // 點擊釘選按鈕
+  pinBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    note.pinned = !note.pinned;
+    save(note);
+    refresh();
+  });
+
+  // 點擊主內容才開編輯器
+  main.addEventListener("click", e => {
+    if(main.dataset.dragging) return; // 拖曳不打開
+    openEditor(note);
   });
 }
+
 
 
 /* ========= Editor Swipe Back (Safe Version) ========= */
@@ -596,9 +711,12 @@ document.getElementById("searchBox").addEventListener("input", async e=>{
 });
 
 
+// 🔹 初始化時綁一次搜尋事件
+searchInput.addEventListener("input", refresh);
 
-/* ========= Init ========= */
+// 🔹 最後啟動 DB 並刷新列表
 openDB().then(refresh);
+
 </script>
 
 </body>
