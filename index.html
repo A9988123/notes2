@@ -44,7 +44,7 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
   position:absolute;
   top:0;
   bottom:0;
-  width:80px;
+  width:120px;
   z-index:1;
 }
 
@@ -99,6 +99,18 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
   display:block;
 }
 
+
+
+/* =====列表可上下滑    整體畫面不可左右滑  ===== */
+html, body {
+  overscroll-behavior: none;
+  touch-action: pan-y;
+}
+
+.note-item {
+  touch-action: pan-y pinch-zoom;
+}
+/* ====================================== */
 
 
 /* ===== FAB ===== */
@@ -242,43 +254,39 @@ async function refresh(){
 ========= */
 
 function renderNote(n){
- if(!n.timestamp) n.timestamp = Date.now();
+  if(!n.timestamp) n.timestamp = Date.now();
 
- // 🔥 關鍵防呆（解決列表不顯示）
- const text =
-   typeof n.content === "string"
-     ? n.content
-     : "";
+  const text = typeof n.content === "string" ? n.content : "";
+  const date = new Date(n.timestamp).toLocaleDateString();
 
- const lines = text.split("\n");
- const title = lines[0] || "無內容";
- const secondLine = lines[1] || "";
+  let first = text.replace(/\n/g," ");
+  let display1 = first.slice(0, 20);
+  let display2 = first.slice(20);
 
- const d = document.createElement("div");
- d.className = "note-item" + (n.pinned ? " pinned" : "");
+  const d = document.createElement("div");
+  d.className = "note-item" + (n.pinned ? " pinned" : "");
 
- d.innerHTML = `
-  <div class="swipe-bg delete">🗑</div>
-  <div class="swipe-bg pin">📌</div>
-  <div class="note-main">
-    <div class="note-title">${title}</div>
-    <div class="note-sub">
-      ${new Date(n.timestamp).toLocaleDateString()} ${secondLine}
+  d.innerHTML = `
+    <div class="swipe-bg delete">🗑</div>
+    <div class="swipe-bg pin">📌</div>
+    <div class="note-main">
+      <div class="note-title">${display1 || "無內容"}</div>
+      <div class="note-sub">${date} ${display2}</div>
     </div>
-  </div>
- `;
+  `;
 
- d.onclick = () => openEditor(n);
+  d.onclick = () => openEditor(n);
 
- d.oncontextmenu = e=>{
-   e.preventDefault();
-   currentId = n.id;
-   showMenu(e.pageX, e.pageY);
- };
+  d.oncontextmenu = e=>{
+    e.preventDefault();
+    currentId = n.id;
+    showMenu(e.pageX, e.pageY);
+  };
 
- list.appendChild(d);
- addSwipeListeners(d,n);
+  list.appendChild(d);
+  addSwipeListeners(d,n);
 }
+
 
 
 
@@ -487,51 +495,44 @@ function insertVideo(){
 
 /* ========= 左右滑完整邏輯 ========= */
 function addSwipeListeners(item,note){
- let sx=null, dx=0;
- const TH=90;
+  let sx=null, dx=0;
+  const main = item.querySelector(".note-main");
 
- const main = item.querySelector(".note-main");
+  item.addEventListener("pointerdown",e=>{
+    sx = e.clientX;
+    item.setPointerCapture(e.pointerId);
+  });
 
- item.addEventListener("pointerdown",e=>{
-  sx = e.clientX;
-  item.setPointerCapture(e.pointerId);
- });
+  item.addEventListener("pointermove",e=>{
+    if(sx===null) return;
+    dx = e.clientX - sx;
 
- item.addEventListener("pointermove",e=>{
-  if(sx===null) return;
-  dx = e.clientX - sx;
+    if(dx < 0){
+      main.style.transform = `translateX(${Math.max(dx,-120)}px)`;
+    }else{
+      main.style.transform = `translateX(${Math.min(dx,120)}px)`;
+    }
+  });
 
-  if(dx < 0){
-    main.style.transform = `translateX(${Math.max(dx,-80)}px)`;
-  }else{
-    main.style.transform = `translateX(${Math.min(dx,80)}px)`;
-  }
- });
+  item.addEventListener("pointerup",e=>{
+    item.releasePointerCapture(e.pointerId);
 
- item.addEventListener("pointerup",e=>{
-  item.releasePointerCapture(e.pointerId);
-
-  // 左滑刪除
-  if(dx < -TH){
-    if(confirm("刪除這則備忘錄？")){
-      tx("readwrite").delete(note.id);
-      refresh();
+    // 左滑定住
+    if(dx < -60){
+      main.style.transform = "translateX(-120px)";
       return;
     }
-  }
 
-  // 右滑釘選
-  if(dx > TH){
-    note.pinned = !note.pinned;
-    save(note);
-    refresh();
-    return;
-  }
+    // 右滑定住
+    if(dx > 60){
+      main.style.transform = "translateX(120px)";
+      return;
+    }
 
-main.style.transform = "translateX(0)";
-sx = null;
-dx = 0;
- });
+    // 回彈
+    main.style.transform = "translateX(0)";
+    sx=null; dx=0;
+  });
 }
 
 
@@ -581,6 +582,18 @@ dx = 0;
 
 })();
 
+
+
+/* ========= Search ========= */
+document.getElementById("searchBox").addEventListener("input", async e=>{
+  const q = e.target.value.toLowerCase();
+  const ns = await all();
+  list.innerHTML = "";
+  ns.filter(n =>
+    typeof n.content === "string" &&
+    n.content.toLowerCase().includes(q)
+  ).forEach(renderNote);
+});
 
 
 
