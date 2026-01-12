@@ -19,14 +19,67 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
 
 /* ===== Notes ===== */
 .section-title{padding:8px 14px;font-size:13px;color:#777}
+
+
+/* ===== 左滑刪除 / 右滑釘選（iOS bar 條）==== */
+/* 每一列固定高度，避免 bar 露出 */
 .note-item{
-  touch-action: pan-y;      /* 只允許上下滑 */
-  overscroll-behavior: contain;
+  position:relative;
+  overflow:hidden;
+  background:#fff;
 }
 
+/* 主內容一定要蓋滿 */
+.note-main{
+  position:relative;
+  width:100%;
+  padding:12px 14px;
+  background:#fff;
+  z-index:2;
+  transition:transform .25s ease;
+}
+
+/* bar 永遠在底層 */
+.swipe-bg{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:80px;
+  z-index:1;
+}
+
+.swipe-bg.delete{
+  right:0;
+  background:#ff3b30;
+}
+
+.swipe-bg.pin{
+  left:0;
+  background:#ffcc00;
+  color:#333;
+}
+/* ======================================= */
+
+
 .note-item.pinned{background:#fff8dc}
-.note-title{font-size:16px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
-.note-sub{font-size:13px;color:#666;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+
+.note-title{
+  font-size:16px;
+  font-weight:500;
+  display:-webkit-box;
+  -webkit-line-clamp:1;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+.note-sub{
+  font-size:12px;
+  color:#888;
+  display:-webkit-box;
+  -webkit-line-clamp:1;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
 
 .note-item{
   position:relative;
@@ -112,8 +165,7 @@ header{padding:14px 16px 6px;font-size:28px;font-weight:600}
     <button onclick="insertVideo()">影片</button>
   </div>
   <div id="editorContent">
-    <input id="title" placeholder="標題">
-    <textarea id="content" rows="18" placeholder="內容"></textarea>
+    <textarea id="content" rows="20" placeholder="開始輸入…"></textarea>
   </div>
 </div>
 
@@ -176,54 +228,57 @@ async function refresh(){
  normal.forEach(renderNote);
 }
 
-/* ========= Render with Drag & Drop ========= */
+/* ========= 
+✅ iOS 兩行顯示
+
+✅ 左滑刪除
+
+✅ 右滑釘選
+
+✅ 右鍵選單（桌機好用）
+
+❌ 不放拖曳（可再加）
+
+========= */
+
 function renderNote(n){
- if(!n.timestamp)n.timestamp=Date.now();
- const lines=(typeof n.content==="string"?n.content:"").split("\n");
- const d=document.createElement("div");
- d.className="note-item"+(n.pinned?" pinned":"");
- d.draggable = true; // 啟用拖曳
- d.innerHTML=`<div class="note-title">${n.title||lines[0]||"無內容"}</div>
- <div class="note-sub">${new Date(n.timestamp).toLocaleString()} ${lines.slice(1).join(" ")}</div>`;
- d.onclick=()=>openEditor(n);
- d.onmousedown=e=>{if(e.button===1){e.preventDefault();n.pinned=!n.pinned;save(n);refresh();}};
- d.oncontextmenu=e=>{e.preventDefault();currentId=n.id;showMenu(e.pageX,e.pageY);};
+ if(!n.timestamp) n.timestamp = Date.now();
+
+ // 🔥 關鍵防呆（解決列表不顯示）
+ const text =
+   typeof n.content === "string"
+     ? n.content
+     : "";
+
+ const lines = text.split("\n");
+ const title = lines[0] || "無內容";
+ const secondLine = lines[1] || "";
+
+ const d = document.createElement("div");
+ d.className = "note-item" + (n.pinned ? " pinned" : "");
+
+ d.innerHTML = `
+  <div class="swipe-bg delete">🗑</div>
+  <div class="swipe-bg pin">📌</div>
+  <div class="note-main">
+    <div class="note-title">${title}</div>
+    <div class="note-sub">
+      ${new Date(n.timestamp).toLocaleDateString()} ${secondLine}
+    </div>
+  </div>
+ `;
+
+ d.onclick = () => openEditor(n);
+
+ d.oncontextmenu = e=>{
+   e.preventDefault();
+   currentId = n.id;
+   showMenu(e.pageX, e.pageY);
+ };
+
  list.appendChild(d);
-
- addSwipeListeners(d,n); // 左右滑功能
- addDragListeners(d,n);   // 拖曳功能
+ addSwipeListeners(d,n);
 }
-
-/* ========= Drag & Drop ========= */
-function addDragListeners(item,note){
-  item.addEventListener('dragstart', e=>{
-    e.dataTransfer.setData('text/plain', note.id);
-    item.style.opacity = 0.5;
-  });
-  item.addEventListener('dragend', e=>{
-    item.style.opacity = 1;
-  });
-  item.addEventListener('dragover', e=>{
-    e.preventDefault(); // 允許 drop
-  });
-  item.addEventListener('drop', e=>{
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('text/plain');
-    if(draggedId === note.id) return;
-    all().then(ns=>{
-      const draggedNote = ns.find(x=>x.id===draggedId);
-      if(!draggedNote) return;
-      // 移動 draggedNote 到 note 的前面
-      const newOrder = ns.filter(x=>x.id!==draggedId);
-      const index = newOrder.findIndex(x=>x.id===note.id);
-      newOrder.splice(index,0,draggedNote);
-      // 依順序重新保存 timestamp，以控制顯示順序
-      newOrder.forEach((x,i)=>{ x.timestamp = Date.now() + i; save(x); });
-      refresh();
-    });
-  });
-}
-
 
 
 
@@ -231,27 +286,55 @@ function addDragListeners(item,note){
 
 /* ========= Editor ========= */
 const editor=document.getElementById("editor");
-const titleI=document.getElementById("title");
 const contentI=document.getElementById("content");
 
+
+/* ========= 打開編輯器時只顯示內容 ========= */
 function openEditor(n){
- currentId=n.id;
- titleI.value=n.title||"";
- contentI.value=n.encrypted?"🔒 已加密，請解密":(n.content||"");
- contentI.disabled=!!n.encrypted;
- editor.style.display="flex";
+ currentId = n.id;
+ contentI.value = n.encrypted
+   ? "🔒 已加密，請解密"
+   : (n.content || "");
+ contentI.disabled = !!n.encrypted;
+
+ // 🔥 關鍵：隱藏列表與 FAB
+ document.getElementById("noteList").style.display = "none";
+ document.getElementById("fab").style.display = "none";
+ document.getElementById("searchBox").style.display = "none";
+
+ editor.style.display = "flex";
 }
-function closeEditor(){editor.style.display="none";}
+
+
+function closeEditor(){
+ editor.style.display = "none";
+
+ // 🔥 回到列表
+ document.getElementById("noteList").style.display = "";
+ document.getElementById("fab").style.display = "";
+ document.getElementById("searchBox").style.display = "";
+}
+
+
+/* ========= 存檔時自動拆第一行當標題 ========= */
 function saveEditor(){
- if(!currentId)return;
+ if(!currentId) return;
+
  all().then(ns=>{
-  const n=ns.find(x=>x.id===currentId);
-  if(!n||n.encrypted)return;
-  n.title=titleI.value;
-  n.content=contentI.value;
-  save(n);refresh();
+  const n = ns.find(x=>x.id===currentId);
+  if(!n || n.encrypted) return;
+
+  const text = contentI.value.trim();
+  const lines = text.split("\n");
+
+  n.title = lines[0] || "";
+  n.content = text;
+
+  save(n);
+  refresh();
  });
 }
+
 
 /* ========= New ========= */
 function newNote(){
@@ -402,40 +485,55 @@ function insertVideo(){
   if(url) contentI.setRangeText(`<video src="${url}" controls></video>`, contentI.selectionStart, contentI.selectionEnd, 'end');
 }
 
-/* ========= Swipe Gestures ========= */
+/* ========= 左右滑完整邏輯 ========= */
 function addSwipeListeners(item,note){
-  let sx=null, dx=0;
-  const TH=120;
+ let sx=null, dx=0;
+ const TH=90;
 
-  item.addEventListener("pointerdown",e=>{
-    sx=e.clientX; dx=0;
-    item.setPointerCapture(e.pointerId);
-  });
+ const main = item.querySelector(".note-main");
 
-  item.addEventListener("pointermove",e=>{
-    if(sx===null) return;
-    dx=e.clientX-sx;
+ item.addEventListener("pointerdown",e=>{
+  sx = e.clientX;
+  item.setPointerCapture(e.pointerId);
+ });
 
-    if(dx< -30){
-      item.classList.add("show-delete");
-      e.preventDefault();
+ item.addEventListener("pointermove",e=>{
+  if(sx===null) return;
+  dx = e.clientX - sx;
+
+  if(dx < 0){
+    main.style.transform = `translateX(${Math.max(dx,-80)}px)`;
+  }else{
+    main.style.transform = `translateX(${Math.min(dx,80)}px)`;
+  }
+ });
+
+ item.addEventListener("pointerup",e=>{
+  item.releasePointerCapture(e.pointerId);
+
+  // 左滑刪除
+  if(dx < -TH){
+    if(confirm("刪除這則備忘錄？")){
+      tx("readwrite").delete(note.id);
+      refresh();
+      return;
     }
-  });
+  }
 
-  item.addEventListener("pointerup",e=>{
-    item.releasePointerCapture(e.pointerId);
+  // 右滑釘選
+  if(dx > TH){
+    note.pinned = !note.pinned;
+    save(note);
+    refresh();
+    return;
+  }
 
-    if(dx<-TH){
-      if(confirm("刪除此筆備忘錄？")){
-        tx("readwrite").delete(note.id);
-        refresh();
-      }
-    }
-
-    item.classList.remove("show-delete");
-    sx=null; dx=0;
-  });
+main.style.transform = "translateX(0)";
+sx = null;
+dx = 0;
+ });
 }
+
 
 /* ========= Editor Swipe Back (Safe Version) ========= */
 (()=>{
