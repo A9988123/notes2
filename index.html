@@ -9,142 +9,334 @@
 <meta name="theme-color" content="#4A90E2">
 
 <style>
-body{margin:0;font-family:-apple-system;background:#f5f5f5}
+body {
+  margin: 0;
+  font-family: -apple-system, system-ui;
+  background: #f5f5f5;
+}
 
 /* ===== Header ===== */
-header{padding:14px 16px 6px;font-size:28px;font-weight:600}
+header {
+  padding: 14px 16px 6px;
+  font-size: 28px;
+  font-weight: 600;
+}
 
 /* ===== Search ===== */
-#searchBox{width:calc(100% - 20px);margin:0 10px 10px;padding:10px;font-size:16px;border-radius:10px;border:1px solid #ddd}
-
-/* ===== Notes ===== */
-.section-title{padding:8px 14px;font-size:13px;color:#777}
-
-
-/* ===== 左滑刪除 / 右滑釘選（iOS bar 條）==== */
-/* 每一列固定高度，避免 bar 露出 */
-.note-item{
-  position:relative;
-  overflow:hidden;
-  background:#fff;
+#searchBox {
+  width: calc(100% - 20px);
+  margin: 0 10px 10px;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
 }
 
-/* 主內容一定要蓋滿 */
-.note-main{
-  position:relative;
-  width:100%;
-  padding:12px 14px;
-  background:#fff;
-  z-index:2;
-  transition:transform .25s ease;
+/* ===== Section Title ===== */
+.section-title {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #777;
 }
 
-/* bar 永遠在底層 */
-.swipe-bg{
-  position:absolute;
-  top:0;
-  bottom:0;
-  width:120px;
-  z-index:1;
-}
 
-.swipe-bg.delete{
-  right:0;
-  background:#ff3b30;
-}
-
-.swipe-bg.pin{
-  left:0;
-  background:#ffcc00;
-  color:#333;
-}
-/* ======================================= */
-
-
-.note-item.pinned{background:#fff8dc}
-
-.note-title{
-  font-size:16px;
-  font-weight:500;
-  display:-webkit-box;
-  -webkit-line-clamp:1;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
-}
-
-.note-sub{
-  font-size:12px;
-  color:#888;
-  display:-webkit-box;
-  -webkit-line-clamp:1;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
-}
-
-.note-item{
-  position:relative;
-  background:white;
-}
-.note-item::after{
-  content:"🗑 刪除";
-  position:absolute;
-  right:14px;
-  top:50%;
-  transform:translateY(-50%);
-  font-size:18px;
-  color:#d33;
-  display:none;
-}
-.note-item.show-delete::after{
-  display:block;
+.row-resizer {
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
 }
 
 
 
-/* =====列表可上下滑    整體畫面不可左右滑  ===== */
-html, body {
-  overscroll-behavior: none;
-  touch-action: pan-y;
-}
 
+/* ===== Notes List ===== */
 .note-item {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
   touch-action: pan-y pinch-zoom;
 }
-/* ====================================== */
+
+.note-item.pinned {
+  background: #fff8dc;
+}
+
+/* swipe 背景 bar */
+.swipe-bg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 120px;
+  z-index: 1;
+}
+
+.swipe-bg.delete {
+  right: 0;
+  background: #ff3b30;
+}
+
+.swipe-bg.pin {
+  left: 0;
+  background: #ffcc00;
+  color: #333;
+}
+
+/* 主內容區塊 */
+.note-main {
+  position: relative;
+  width: 100%;
+  padding: 12px 14px;
+  background: #fff;
+  z-index: 2;
+  transition: transform 0.25s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* 讓縮圖垂直置中 */
+}
+
+/* 文字容器 */
+.note-main > div:first-child {
+  flex: 1;
+  min-width: 0; /* 文字截斷有效 */
+}
+
+/* 標題與副標題文字截斷 */
+.note-title {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-sub {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 刪除提示（浮在右側） */
+.note-item::after {
+  content: "🗑 刪除";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: #d33;
+  display: none;
+}
+
+.note-item.show-delete::after {
+  display: block;
+}
 
 
-/* ===== FAB ===== */
-#fab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;font-size:32px}
+#tableMenu div{
+  padding:8px 14px;
+  cursor:pointer;
+}
+#tableMenu div:hover{
+  background:#f0f0f0;
+}
+
+
+.note-table td {
+  position: relative;
+}
+
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+
+
+
+/* ===== FAB 新增按鈕 ===== */
+#fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  font-size: 32px;
+  background: #4a90e2;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: pointer;
+}
 
 /* ===== Context Menu ===== */
-#contextMenu{position:fixed;background:#fff;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,.25);display:none;z-index:9999}
-#contextMenu div{padding:10px 14px;cursor:pointer}
-#contextMenu div:hover{background:#f0f0f0}
+#contextMenu {
+  position: fixed;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: none;
+  z-index: 9999;
+}
+
+#contextMenu div {
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+#contextMenu div:hover {
+  background: #f0f0f0;
+}
 
 /* ===== Editor ===== */
-#editor{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f5f5;flex-direction:column}
-#editorHeader{display:flex;justify-content:space-between;align-items:center;padding:10px;background:#4A90E2;color:white}
-#editorToolbar{display:flex;padding:6px 10px;background:#eee;gap:6px;flex-wrap:wrap}
-#editorToolbar button{padding:6px 10px;border:none;border-radius:6px;background:white;cursor:pointer;font-weight:bold;}
-#editorToolbar button:hover{background:#ddd;}
-#editorContent{flex:1;padding:10px;display:flex;flex-direction:column}
-#editorContent input,#editorContent textarea{width:100%;padding:10px;margin-bottom:8px;font-size:16px;border-radius:10px;border:1px solid #ccc;resize:none;}
-/* ===== Editor Swipe Hint ===== */
-#editorSwipeHint{
-  position:fixed;
-  top:0;left:0;
-  width:100%;height:100%;
-  display:none;
-  align-items:center;
-  justify-content:flex-start;
-  padding-left:20px;
-  font-size:22px;
-  font-weight:600;
-  color:#4A90E2;
-  background:rgba(245,245,245,.85);
-  z-index:9998;
-  pointer-events:none;
+#editor {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+  flex-direction: column;
 }
+
+#editorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #4a90e2;
+  color: white;
+}
+
+#editorToolbar {
+  display: flex;
+  padding: 6px 10px;
+  background: #eee;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+#editorToolbar button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#editorToolbar button:hover {
+  background: #ddd;
+}
+
+#editorContent {
+  flex: 1;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+#editorContent input,
+#editorContent textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  resize: none;
+}
+
+/* Editor Swipe Hint */
+#editorSwipeHint {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 20px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #4a90e2;
+  background: rgba(245, 245, 245, 0.85);
+  z-index: 9998;
+  pointer-events: none;
+}
+
+/* ===== iOS 備忘錄列表右側縮圖 ===== */
+.note-preview {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px; /* 與文字間隔 */
+}
+
+/* 圖片縮圖 */
+.note-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+}
+
+/* 影片縮圖 */
+.note-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+}
+
+/* 表格縮圖（簡化） */
+.note-preview.table {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #666;
+  background: #f2f2f2;
+}
+
+
+.cell-selected {
+  background: #cce5ff;
+}
+
+
+.note-thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  margin-left: 6px;
+}
+
+
 
 </style>
 </head>
@@ -157,6 +349,8 @@ html, body {
 </header>
 
 <input id="searchBox" placeholder="🔍 搜尋">
+<div id="searchResultInfo" class="section-title" style="display:none;"></div>
+
 
 <div id="noteList"></div>
 <button id="fab" onclick="newNote()">＋</button>
@@ -169,6 +363,8 @@ html, body {
     <button onclick="saveEditor()">存檔</button>
   </div>
   <div id="editorToolbar">
+  <button onclick="changeFontSize(true)">🔼</button> <!-- 字體放大 -->
+  <button onclick="changeFontSize(false)">🔽</button> <!-- 字體縮小 -->
     <button onclick="formatText('bold')">B</button>
     <button onclick="formatText('italic')">I</button>
     <button onclick="formatText('underline')">U</button>
@@ -178,6 +374,8 @@ html, body {
   </div>
 <div id="editorContent">
   <div id="content" contenteditable="true" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:10px; overflow:auto;" placeholder="開始輸入…"></div>
+</div>
+
 </div>
 
 </div>
@@ -197,15 +395,54 @@ html, body {
   z-index:9999;">
 </div>
 
-
-
-
 <input type="file" id="backupFile" style="display:none" accept=".json">
 
 <input type="file" id="imgPicker" accept="image/*" hidden>
 
 
+<div id="tableMenu" style="
+  position:fixed;
+  display:none;
+  background:#fff;
+  border:1px solid #ccc;
+  border-radius:6px;
+  box-shadow:0 4px 10px rgba(0,0,0,.15);
+  z-index:9999;
+">
+  <div data-act="merge">合併儲存格</div>
+<div data-act="merge-vertical">垂直合併</div>
+  <div data-act="split">分割儲存格</div>
+  <div data-act="delete">刪除表格</div>
+<div data-act="add-col-left">⬅ 插入欄</div>
+<div data-act="add-col-right">➡ 插入欄</div>
+<div data-act="add-row-up">⬆ 插入列</div>
+<div data-act="add-row-down">⬇ 插入列</div>
+
+</div>
+
+
+
+<div id="mediaMenu" style="
+  position:fixed;
+  display:none;
+  background:#fff;
+  border:1px solid #ccc;
+  border-radius:6px;
+  box-shadow:0 4px 10px rgba(0,0,0,.15);
+  z-index:9999;
+">
+  <div data-act="zoomIn">放大</div>
+  <div data-act="zoomOut">縮小</div>
+  <div data-act="delete">刪除</div>
+</div>
+
+
+
+
+
+
 <script>
+
 /* ========= IndexedDB ========= */
 const DB_NAME="notesDB",STORE="notes";
 let db,currentId=null;
@@ -234,7 +471,6 @@ async function decryptText(o,pw){
  return new TextDecoder().decode(buf);
 }
 
-
 /* ========= 
 ✅ iOS 兩行顯示
 
@@ -262,100 +498,185 @@ function highlight(text, keyword){
   return text.replace(re, '<mark>$1</mark>');
 }
 
-// 刷新列表時，將關鍵字帶入
-async function refresh(){
+
+// 刷新列表時，將關鍵字帶入（含搜尋鎖定）
+async function refresh() {
   const q = searchInput.value.trim().toLowerCase();
-  const ns = await all();
-  list.innerHTML = "";
-  const pinned = ns.filter(n => n.pinned);
-  const normal = ns.filter(n => !n.pinned);
-  if(pinned.length){
-    list.innerHTML += `<div class="section-title">已釘選</div>`;
-    pinned.forEach(n => renderNote(n, q));
+  const info = document.getElementById("searchResultInfo");
+
+  if (isSearching && !q) return;
+
+  const ns = (await all()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  const filtered = ns.filter(n => {
+    if (!q) return true;
+    if (typeof n.content !== "string") return false;
+    return n.content.toLowerCase().includes(q);
+  });
+
+  if (q) {
+    info.style.display = "block";
+    info.textContent = filtered.length
+      ? `找到 ${filtered.length} 筆結果`
+      : "沒有符合的備忘錄";
+  } else {
+    info.style.display = "none";
   }
-  normal.forEach(n => renderNote(n, q));
+
+  list.innerHTML = "";
+
+  const pinned = filtered.filter(n => n.pinned);
+  const normal = filtered.filter(n => !n.pinned);
+
+  function renderWithContext(note) {
+    renderNote(note, q); // renderNote 本身就 append 到 list
+    const noteItems = list.querySelectorAll(".note-item"); 
+    const lastItem = noteItems[noteItems.length - 1]; // 取得剛 render 出來的那個
+    addContextMenuToNoteItem(lastItem, note); // 綁定右鍵
+  }
+
+  if (pinned.length) {
+    list.innerHTML += `<div class="section-title">已釘選</div>`;
+    pinned.forEach(renderWithContext);
+  }
+
+  normal.forEach(renderWithContext);
 }
 
 
-// renderNote 改成接收關鍵字
-function renderNote(n, keyword = ""){
-  if(!n.timestamp) n.timestamp = Date.now();
+/* =============================renderNote 改成接收關鍵字=========================================== */
 
-  const text = typeof n.content === "string" ? n.content : "";
-  const date = new Date(n.timestamp).toLocaleDateString();
+function renderNote(n, keyword="") {
+  if (!n.timestamp) n.timestamp = Date.now();
 
-  let first = text.replace(/\n/g," ");
-  let display1 = first.slice(0, 20);
-  let display2 = first.slice(20);
+  const { lines, firstMedia } = extractTextLinesFromHTMLWithMedia(n.content || "");
 
-  // 高亮關鍵字
-  display1 = highlight(display1, keyword);
-  display2 = highlight(display2, keyword);
+  let line1 = lines[0] || "無內容";
+  if (line1.length > 30) line1 = line1.slice(0, 30) + "...";
+
+  let line2Text = lines[1] || "";
+  if (keyword) {
+    const hitLine = lines.find(
+      (l, i) => i !== 0 && l.toLowerCase().includes(keyword)
+    );
+    if (hitLine) line2Text = hitLine;
+  }
+
+  if (line2Text.length > 40) line2Text = line2Text.slice(0, 40) + "...";
+
+  const timeText = formatListTime(n.timestamp);
+  let line2 = `${timeText} ${line2Text}`;
+
+  if (keyword) {
+    line1 = highlight(line1, keyword);
+    line2 = highlight(line2, keyword);
+  }
 
   const d = document.createElement("div");
   d.className = "note-item" + (n.pinned ? " pinned" : "");
 
   d.innerHTML = `
-    <div class="swipe-bg delete">🗑</div>
-    <div class="swipe-bg pin">📌</div>
-    <div class="note-main">
-      <div class="note-title">${display1 || "無內容"}</div>
-      <div class="note-sub">${date} ${display2}</div>
+    <div class="swipe-bg delete"></div>
+    <div class="swipe-bg pin"></div>
+    <div class="note-main" style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="flex:1; min-width:0;">
+        <div class="note-title">${line1}</div>
+        <div class="note-sub">${line2}</div>
+      </div>
+      <div class="note-thumb" style="margin-left:-12px; position:relative; width: 60px; height: 60px; overflow: hidden; border-radius: 4px; background-color: #f0f0f0;">
+        <!-- 縮圖放置區 -->
+      </div>
     </div>
   `;
 
+// 放置縮圖（圖片 / 影片 / 表格）
+const thumb = d.querySelector(".note-thumb");
+
+if (firstMedia) {
+  if (firstMedia.tagName === "IMG") {
+    const img = document.createElement("img");
+    img.src = firstMedia.src;
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "cover";   // ✅ 填滿，不留白
+    img.style.borderRadius = "6px";
+    thumb.appendChild(img);
+
+  } else if (firstMedia.tagName === "VIDEO") {
+    const vid = document.createElement("video");
+    vid.src = firstMedia.src;
+    vid.muted = true;
+    vid.playsInline = true;
+    vid.style.width = "100%";
+    vid.style.height = "100%";
+    vid.style.objectFit = "cover";   // ✅ 不保持比例
+    thumb.appendChild(vid);
+
+  } else if (firstMedia.tagName === "TABLE") {
+    const table = document.createElement("table");
+    table.style.width = "100%";
+    table.style.height = "100%";
+    table.style.borderCollapse = "collapse";
+    table.style.fontSize = "7px";
+    table.style.tableLayout = "fixed";
+    table.style.transform = "scale(0.9)"; // ✅ 避免被裁
+    table.style.transformOrigin = "top left";
+
+    const rows = firstMedia.rows;
+    for (let r = 0; r < Math.min(2, rows.length); r++) {
+      const tr = document.createElement("tr");
+      for (let c = 0; c < Math.min(2, rows[r].cells.length); c++) {
+        const td = document.createElement("td");
+        td.style.border = "1px solid #ccc";
+        td.style.padding = "0";
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    thumb.appendChild(table);
+  }
+}
+
+
   d.onclick = () => openEditor(n);
-
-  d.oncontextmenu = e=>{
-    e.preventDefault();
-    currentId = n.id;
-    showMenu(e.pageX, e.pageY);
-  };
-
+  addSwipeListeners(d, n);
   list.appendChild(d);
-  addSwipeListeners(d,n);
 }
 
 
 
 
 
-/* ========= Editor ========= */
+
+
+
+/* ========= Editor ================================================================================= */
 const editor=document.getElementById("editor");
 const contentI=document.getElementById("content");
 
 
-/* ========= 打開編輯器時只顯示內容 ========= */
+/* ========= 打開編輯器 ========= */
 function openEditor(n){
   currentId = n.id;
+
   if(n.encrypted){
     contentI.innerHTML = "🔒 已加密，請解密";
     contentI.contentEditable = false;
   } else {
     contentI.innerHTML = n.content || "";
     contentI.contentEditable = true;
+
+    // ✅ 新增：綁定自動儲存（只在未加密時）
+    bindAutoSave(contentI, n);
   }
 
   document.getElementById("noteList").style.display = "none";
   document.getElementById("fab").style.display = "none";
   document.getElementById("searchBox").style.display = "none";
-
   editor.style.display = "flex";
 }
 
-
-
-function closeEditor(){
- editor.style.display = "none";
-
- // 🔥 回到列表
- document.getElementById("noteList").style.display = "";
- document.getElementById("fab").style.display = "";
- document.getElementById("searchBox").style.display = "";
-}
-
-
-/* ========= 存檔時自動拆第一行當標題 ========= */
+/* ========= 存檔 ========= */
 function saveEditor(){
   if(!currentId) return;
 
@@ -363,25 +684,34 @@ function saveEditor(){
     const n = ns.find(x=>x.id===currentId);
     if(!n || n.encrypted) return;
 
-    const html = contentI.innerHTML;  // ✅ 抓取 contenteditable HTML
-    const text = contentI.innerText.trim(); // 可拆第一行當標題
+    const html = contentI.innerHTML; // HTML
+    const text = contentI.innerText.trim(); // 用文字第一行作標題
     const lines = text.split("\n");
 
-    n.title = lines[0] || "";
-    n.content = html;  // ✅ 存 HTML 而不是 value
+n.content = html;
+n.title = lines[0] || "";
+n.timestamp = Date.now(); // 🔥 關鍵
+save(n);
 
-    save(n);
     refresh();
   });
 }
 
-
-
-/* ========= New ========= */
+/* ========= 新增筆記 ========= */
 function newNote(){
- const n={id:Date.now().toString(),title:"",content:"",encrypted:false,pinned:false,timestamp:Date.now()};
- save(n);openEditor(n);
+  const n = {
+  id: Date.now().toString(),
+  title: "",
+  content: "",
+  encrypted: false,
+  pinned: false,
+  timestamp: Date.now() // 🔥
+};
+  save(n);
+  contentI.innerHTML = ""; // 清空編輯器
+  openEditor(n);
 }
+
 
 /* ========= Context / Top Menu 共用內容 ========= */
 const menuHTML = `
@@ -392,64 +722,261 @@ const menuHTML = `
 <div onclick="exportAllNotes()">📦 匯出全部</div>
 <div onclick="document.getElementById('backupFile').click()">📥 匯入</div>
 <div onclick="deleteCurrent()">🗑 刪除</div>
+ <div onclick="confirmPasswordAndDelete()">🗑 全部刪除</div> <!-- 新增「全部刪除」選項 -->
 `;
 
 
 /* ========= Context Menu ========= */
 const menu = document.getElementById("contextMenu");
-const topMenu = document.getElementById("topMenu");
 
-menu.innerHTML = menuHTML;
-topMenu.innerHTML = menuHTML;
+  // 顯示右鍵菜單
+  function showMenu(event, note) {
+    event.preventDefault(); // 阻止右鍵菜單的默認行為
+    menu.innerHTML = menuHTML; // 確保菜單內容是最新的
+
+    // 設置菜單的位置
+    menu.style.left = `${event.clientX}px`;
+    menu.style.top = `${event.clientY}px`;
+    menu.style.display = "block";
+
+    // 為每個菜單項綁定對應的功能
+    menu.querySelector("div[onclick='ctxEncrypt()']").onclick = () => ctxEncrypt(note);
+    menu.querySelector("div[onclick='ctxDecrypt(false)']").onclick = () => ctxDecrypt(false, note);
+    menu.querySelector("div[onclick='ctxDecrypt(true)']").onclick = () => ctxDecrypt(true, note);
+    menu.querySelector("div[onclick='exportSingleNote()']").onclick = () => exportSingleNote(note);
+    menu.querySelector("div[onclick='deleteCurrent()']").onclick = () => deleteCurrent(note);
+    
+    // 隱藏原列表區右上角的功能
+    document.getElementById("topMenu").style.display = "none";
+  }
+
+  // 註冊右鍵事件
+  function addContextMenuToNoteItem(noteItem, note) {
+    noteItem.addEventListener('contextmenu', (event) => showMenu(event, note));
+  }
 
 
-function showMenu(x,y){
-  menu.style.left = x + "px";
-  menu.style.top  = y + "px";
-  menu.style.display = "block";
+/* ========= Encrypt / Decrypt (prompt) ========= */
+ // 在保存筆記時記錄選擇的 ID
+  async function ctxEncrypt(note) {
+    const pw = prompt("請輸入加密密碼");
+    if (!pw) return;
+
+    note.content = await encryptText(note.content, pw);
+    note.encrypted = true;
+    save(note);
+    refresh();
+  }
+
+  async function ctxDecrypt(permanent, note) {
+    const pw = prompt("請輸入解密密碼");
+    if (!pw) return;
+
+    try {
+      const txt = await decryptText(note.content, pw);
+      if (permanent) {
+        note.content = txt;
+        note.encrypted = false;
+        save(note);
+        refresh();
+      } else {
+        alert(txt);
+      }
+    } catch {
+      alert("解密失敗");
+    }
+  }
+
+async function exportSingleNote(note) {
+  let txt = note.content;
+
+  if (note.encrypted) {
+    const pw = prompt("輸入原密碼");
+    if (!pw) return;
+    txt = await decryptText(note.content, pw);
+  }
+
+  const bpw = prompt("備份密碼");
+  if (!bpw) return;
+
+  const enc = await encryptText(txt, bpw);
+
+  downloadFile(
+    JSON.stringify({
+      title: note.title,
+      content: "enc:" + JSON.stringify(enc),
+      timestamp: note.timestamp
+    }, null, 2),
+    `${note.title || "note"}.json`
+  );
 }
 
-function toggleTopMenu(e){
-  e.stopPropagation(); // 🔥 關鍵
-  topMenu.style.display =
-    topMenu.style.display === "block" ? "none" : "block";
+/* ========= 新增「全部刪除」選項  ========= */
+
+// 刪除所有筆記的操作
+async function deleteAllNotes() {
+    const notes = await all();
+    const txObject = tx("readwrite");
+    notes.forEach(note => txObject.delete(note.id));  // 刪除所有筆記
+    alert("所有筆記已成功刪除！");
+    refresh();  // 重新整理列表
+}
+
+
+/* ========= 設置密碼 (首次設置)  ========= */
+
+
+// 密碼加密
+async function encryptPassword(password) {
+    const salt = new Uint8Array(16);  // 你可以選擇隨機生成salt
+    crypto.getRandomValues(salt);  // 隨機生成 salt
+
+    const enc = new TextEncoder();
+    const baseKey = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(password), 
+        "PBKDF2", 
+        false, 
+        ["deriveKey"]
+    );
+
+    // 使用 PBKDF2 派生出 AES 密鑰
+    const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+    );
+
+    // 用 AES-GCM 加密 password 字串
+    const iv = crypto.getRandomValues(new Uint8Array(12));  // 隨機初始化向量
+    const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        enc.encode(password)
+    );
+
+    return { iv: Array.from(iv), salt: Array.from(salt), data: Array.from(new Uint8Array(encrypted)) };
+}
+
+
+// 設置密碼並加密存儲
+async function setPassword(password) {
+    const key = await encryptPassword(password); // 加密密碼
+    const encryptedPassword = JSON.stringify(key); // 可以根據需求對密鑰進行序列化
+    localStorage.setItem("encryptedPassword", encryptedPassword); // 存儲加密密鑰
+    alert("密碼已設置！");
+}
+
+// 設置密碼的界面
+function setupPassword() {
+    const password = prompt("請設置密碼");
+    if (password) {
+        setPassword(password);
+    }
 }
 
 
 
-document.body.addEventListener('click', e=>{
+/* ========= 密碼確認（刪除所有筆記）  ========= */
+
+// 密碼解密函式
+async function decryptPassword(encryptedPassword, inputPassword) {
+    const enc = new TextEncoder();
+    const salt = new Uint8Array(encryptedPassword.salt);
+    const baseKey = await crypto.subtle.importKey("raw", enc.encode(inputPassword), "PBKDF2", false, ["deriveKey"]);
+    
+    // 派生 AES 密鑰
+    const key = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+    );
+
+    // 解密密碼
+    const iv = new Uint8Array(encryptedPassword.iv);
+    const data = new Uint8Array(encryptedPassword.data);
+    try {
+        const decryptedBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+        const decryptedPassword = new TextDecoder().decode(decryptedBuffer);
+        return decryptedPassword === inputPassword;  // 比對解密後的密碼
+    } catch (e) {
+        return false;  // 密碼錯誤
+    }
+}
+
+
+// 密碼確認後執行刪除
+async function confirmPasswordAndDelete() {
+    const encryptedPassword = JSON.parse(localStorage.getItem("encryptedPassword"));
+    if (!encryptedPassword) {
+        // 密碼尚未設置，提示用戶設置密碼
+        const newPassword = prompt("密碼尚未設置，請設置新密碼。");
+
+        if (newPassword) {
+            const encrypted = await encryptPassword(newPassword);  // 將密碼加密
+            localStorage.setItem("encryptedPassword", JSON.stringify(encrypted));  // 儲存加密後的密碼
+            alert("密碼設置成功！請再次操作「全部刪除」。");
+        } else {
+            alert("密碼設置失敗，請重新設置！");
+        }
+
+        return;  // 跳過後續的刪除操作
+    }
+
+    const password = prompt("請輸入密碼進行確認");
+
+    if (password) {
+        const isValid = await decryptPassword(encryptedPassword, password);
+        if (isValid) {
+            if (confirm("確定要刪除所有筆記嗎？這個操作無法恢復！")) {
+                deleteAllNotes(); // 執行刪除操作
+            }
+        } else {
+            alert("密碼錯誤，操作取消！");
+        }
+    }
+}
+
+
+// 刪除所有筆記
+async function deleteAllNotes() {
+    if (!confirm("確定要刪除所有筆記嗎？這個操作無法恢復！")) return;
+
+    // 刪除所有筆記
+    const notes = await all();
+    const txObject = tx("readwrite");
+    notes.forEach(note => txObject.delete(note.id));  // 刪除所有筆記
+    alert("所有筆記已成功刪除！");
+    refresh();  // 重新整理列表
+}
+
+
+
+
+
+//====================================================
+
+  async function deleteCurrent(note) {
+    if (!confirm("確定刪除？")) return;
+    tx("readwrite").delete(note.id);
+    refresh();
+  }
+
+
+document.body.addEventListener('click', e => {
   const clickInContextMenu = e.target.closest('#contextMenu');
   const clickInTopMenu     = e.target.closest('#topMenu');
   const clickInHeader      = e.target.closest('header');
 
-  if(!clickInContextMenu && !clickInTopMenu && !clickInHeader){
+  if (!clickInContextMenu && !clickInTopMenu && !clickInHeader) {
     menu.style.display = "none";
-    topMenu.style.display = "none";
+    topMenu.style.display = "none"; // 如果你想在點空白時同時隱藏上方功能
   }
 });
-
-/* ========= Encrypt / Decrypt (prompt) ========= */
-async function ctxEncrypt(){
- const pw=prompt("請輸入加密密碼"); if(!pw)return;
- const ns=await all(); const n=ns.find(x=>x.id===currentId);
- n.content=await encryptText(n.content,pw); n.encrypted=true; save(n); refresh();
-}
-async function ctxDecrypt(permanent){
- const pw=prompt("請輸入解密密碼"); if(!pw)return;
- const ns=await all(); const n=ns.find(x=>x.id===currentId);
- try{
-  const txt=await decryptText(n.content,pw);
-  if(permanent){n.content=txt;n.encrypted=false;save(n);refresh();}
-  else alert(txt);
- }catch{alert("❌ 解密失敗");}
-}
-
-/* ========= Delete ========= */
-async function deleteCurrent(){
- const ns=await all(); const n=ns.find(x=>x.id===currentId);
- if(!confirm("確定刪除？"))return;
- tx("readwrite").delete(n.id); refresh();
-}
 
 /* ========= Export / Import ========= */
 function downloadFile(c,f){
@@ -459,26 +986,65 @@ function downloadFile(c,f){
  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
 }
 
-async function exportSingleNote(){
- const ns=await all(); const n=ns.find(x=>x.id===currentId);
- let txt=n.content;
- if(n.encrypted){const pw=prompt("輸入原密碼");txt=await decryptText(n.content,pw);}
- const bpw=prompt("備份密碼"); if(!bpw)return;
- const enc=await encryptText(txt,bpw);
- downloadFile(JSON.stringify({title:n.title,content:"enc:"+JSON.stringify(enc)},null,2),`${n.title||"note"}.json`);
+
+
+async function exportAllNotes() {
+    const ns = await all();
+    const upw = prompt("輸入原解密密碼（若有加密）");
+    if (upw === null) return;
+    const bpw = prompt("輸入備份密碼");
+    if (!bpw) return;
+
+    const out = {};
+
+    for (const n of ns) {
+        try {
+            let txt = (n.content ?? "").toString(); // 確保是字串
+
+            // 先解密（如果是加密筆記）
+            if (n.encrypted) {
+                txt = await decryptText(n.content, upw);
+            }
+
+            // 🔹 避免超大影片或圖片造成加密失敗
+            const div = document.createElement("div");
+            div.innerHTML = txt;
+
+            // 移除影片（避免大檔案）
+            div.querySelectorAll("video").forEach(v => v.remove());
+
+            // 移除過大的圖片（例如 base64 超過 100 KB 可調整）
+            div.querySelectorAll("img").forEach(img => {
+                if (img.src.length > 100000) img.remove();
+            });
+
+            txt = div.innerHTML;
+
+            // 加密筆記內容
+            const enc = await encryptText(txt, bpw);
+
+            out[n.id] = {
+                title: n.title || "",
+                timestamp: n.timestamp,
+                content: "enc:" + JSON.stringify(enc)
+            };
+        } catch (e) {
+            console.warn(`筆記「${n.title || n.id}」匯出失敗，已跳過`, e);
+            continue; // 遇到問題筆記略過，不中止整個匯出
+        }
+    }
+
+    if (Object.keys(out).length === 0) {
+        alert("沒有筆記成功匯出！");
+        return;
+    }
+
+    downloadFile(JSON.stringify(out, null, 2), "notes-backup.json");
+    alert("匯出完成！大檔影片已自動排除，文字與小圖片已備份。");
 }
 
-async function exportAllNotes(){
- const ns=await all();
- const upw=prompt("輸入原解密密碼"); const bpw=prompt("備份密碼");
- const out={};
- for(const n of ns){
-  let txt=n.content;
-  if(n.encrypted) txt=await decryptText(n.content,upw);
-  out[n.id]={title:n.title,content:"enc:"+JSON.stringify(await encryptText(txt,bpw)),timestamp:n.timestamp};
- }
- downloadFile(JSON.stringify(out,null,2),`notes-backup.json`);
-}
+
+
 
 document.getElementById("backupFile").onchange=async e=>{
  const f=e.target.files[0]; if(!f)return;
@@ -496,24 +1062,577 @@ document.getElementById("backupFile").onchange=async e=>{
  refresh();
 };
 
+
+
+/* =========記錄游標位置（任何輸入時） ========= */
+contentI.addEventListener("keyup", saveSelection);
+contentI.addEventListener("mouseup", saveSelection);
+
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    savedRange = sel.getRangeAt(0);
+  }
+}
+
+
+
+
+/* =========JS（表格右鍵） ========= */
+
+let activeCell = null;
+let activeTable = null;
+let activeMedia = null;
+
+contentI.addEventListener("contextmenu", e => {
+  const td = e.target.closest("td");
+  const media = e.target.closest("img, video");
+
+  // ---------- 表格右鍵 ----------
+  if (td) {
+    e.preventDefault();
+
+    activeTable = td.closest("table");
+    activeMedia = null;
+
+    // ✅ 關鍵修正：
+    // 只有在「目前沒有多選」或「右鍵的格子不在選取中」時
+    // 才把它設為 activeCell 並單選
+    if (!selectedCells.has(td)) {
+      clearCellSelection();
+      selectedCells.add(td);
+      td.classList.add("cell-selected");
+      activeCell = td;
+    } else {
+      // 多選狀態下，保留原 activeCell
+      activeCell = Array.from(selectedCells)[0];
+    }
+
+    const menu = document.getElementById("tableMenu");
+    menu.style.left = e.clientX + "px";
+    menu.style.top = e.clientY + "px";
+    menu.style.display = "block";
+
+    document.getElementById("mediaMenu").style.display = "none";
+    return;
+  }
+
+  // ---------- 圖片 / 影片右鍵 ----------
+  if (media) {
+    e.preventDefault();
+
+    activeMedia = media;
+    activeCell = null;
+    activeTable = null;
+
+    const menu = document.getElementById("mediaMenu");
+    menu.style.left = e.clientX + "px";
+    menu.style.top = e.clientY + "px";
+    menu.style.display = "block";
+
+    document.getElementById("tableMenu").style.display = "none";
+    return;
+  }
+});
+
+// 點空白處關閉所有選單
+document.addEventListener("click", () => {
+  document.getElementById("tableMenu").style.display = "none";
+  document.getElementById("mediaMenu").style.display = "none";
+});
+
+
+
+/* ========= 表格右鍵：合併 / 分割 / 刪除 / 插入列欄 ========= */
+document.getElementById("tableMenu").onclick = e => {
+  const act = e.target.dataset.act;
+  if (!act) return;
+
+  // 🔒 沒有 activeCell 直接略過（避免錯誤）
+  if (!activeCell) return;
+
+  const table = activeCell.closest("table");
+  const col = activeCell.cellIndex;
+  const row = activeCell.parentElement.rowIndex;
+
+  // ---------- 原本功能 ----------
+  if (act === "merge") mergeSelectedCells();
+  if (act === "merge-vertical") mergeSelectedCellsVertical();
+  if (act === "split") splitCell(activeCell);
+  if (act === "delete") deleteSelectedCells();
+
+  // ---------- 新增：插入欄 / 列 ----------
+  if (act === "add-col-left") addColumn(table, col);
+  if (act === "add-col-right") addColumn(table, col + 1);
+  if (act === "add-row-up") addRow(table, row);
+  if (act === "add-row-down") addRow(table, row + 1);
+
+  // 🔄 更新拖曳線（避免重複）
+  addColumnResizers(table);
+  addRowResizers(table);
+
+  // 🔥 存入 Undo / AutoSave
+  contentI.dispatchEvent(new Event("input"));
+};
+
+
+
+
+// 新增一列（Row）
+
+function addRow(table, index = null) {
+  const row = table.rows[0];
+  const tr = document.createElement("tr");
+
+  for (let i = 0; i < row.cells.length; i++) {
+    const td = document.createElement("td");
+    td.contentEditable = "true";
+    td.style.border = "1px solid #ccc";
+    td.style.padding = "6px 8px";
+    tr.appendChild(td);
+  }
+
+  if (index === null) table.appendChild(tr);
+  else table.insertBefore(tr, table.rows[index]);
+}
+
+
+
+// 新增一欄（Column）
+
+function addColumn(table, index = null) {
+  Array.from(table.rows).forEach(row => {
+    const td = document.createElement("td");
+    td.contentEditable = "true";
+    td.style.border = "1px solid #ccc";
+    td.style.padding = "6px 8px";
+
+    if (index === null) row.appendChild(td);
+    else row.insertBefore(td, row.cells[index]);
+  });
+}
+
+
+
+
 /* ========= Editor Toolbar Functions ========= */
+/* ========= 編輯器 Toolbar 功能 ========= */
+
 function formatText(cmd){
   document.execCommand(cmd, false, null);
 }
 
+function changeFontSize(increase=true){
+  const sel = window.getSelection();
+  if(!sel.rangeCount) return;
+
+  // execCommand("fontSize") 範圍 1~7
+  // 3 是預設，5 大，7 更大
+  document.execCommand("fontSize", false, increase ? "5" : "3");
+}
 
 
-function insertTable(){
-  const textarea = contentI;
-  const table = `|  |  |\n|--|--|\n|  |  |\n`;
-  const pos = textarea.selectionStart;
-  textarea.setRangeText(table, pos, pos, 'end');
+// 2. 表格設置，並加入合併/分割功能
+function insertTable(rows = 3, cols = 3) {
+  const table = document.createElement("table");
+
+ // ⭐ 新增這裡
+  table.classList.add("note-table");
+  table.setAttribute("contenteditable", "false");
+
+
+  table.style.borderCollapse = "collapse";
+  table.style.margin = "8px 0";
+
+  for (let r = 0; r < rows; r++) {
+    const tr = document.createElement("tr");
+
+    for (let c = 0; c < cols; c++) {
+      const td = document.createElement("td");
+      td.contentEditable = "true";
+      td.style.border = "1px solid #ccc";
+      td.style.padding = "8px 10px";
+      td.style.minWidth = "80px";
+      td.style.minHeight = "36px"; // ⭐ 關鍵
+      td.innerHTML = "\u200B";     // ⭐ 關鍵（零寬字）
+
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+
+  insertNodeAtCursor(table);
+
+  // ✅ 游標正確進第一格
+  const firstCell = table.querySelector("td");
+  placeCaretInsideCell(firstCell);
+
+  contentI.dispatchEvent(new Event("input"));
+
+
+  // ⭐ 一定要在插入 DOM 之後
+  addColumnResizers(table);
+  addRowResizers(table); // 如果你也有列高拖曳
+
+}
+
+
+function addRowResizers(table) {
+  table.querySelectorAll("tr").forEach(tr => {
+    if (tr.querySelector(".row-resizer")) return;
+
+    const grip = document.createElement("div");
+    grip.className = "row-resizer";
+    tr.style.position = "relative";
+    tr.appendChild(grip);
+
+    grip.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = tr.offsetHeight;
+
+      const move = ev => {
+        tr.style.height = startH + (ev.clientY - startY) + "px";
+      };
+
+      const up = () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        contentI.dispatchEvent(new Event("input"));
+      };
+
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up);
+    });
+  });
 }
 
 
 
 
-/* ========= 插入圖片 ========= */
+function placeCaretInsideCell(td) {
+  td.focus();
+
+  if (td.innerHTML === "") {
+    td.innerHTML = "\u200B";
+  }
+
+  const range = document.createRange();
+  const sel = window.getSelection();
+  range.selectNodeContents(td);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+
+
+//   像 Excel 一樣「選取多個儲存格再合併 / 分割」 ===============================
+
+let selectedCells = new Set();
+
+// ===== 滑鼠選取（儲存格 / 整表）=====
+contentI.addEventListener("mousedown", e => {
+
+  // ---------- 1️⃣ 整張表格選取 ----------
+  const table = e.target.closest(".note-table");
+  if (table && !e.target.closest("td")) {
+    e.preventDefault();
+
+    clearCellSelection();
+    activeCell = null;
+    activeTable = table;
+
+    const range = document.createRange();
+    range.selectNode(table);
+
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return;
+  }
+
+  // ---------- 2️⃣ 儲存格選取（你原本的邏輯） ----------
+  const td = e.target.closest("td");
+  if (!td) return;
+
+  // 右鍵不處理（非常重要）
+  if (e.button === 2) return;
+
+  if (!e.ctrlKey && !e.metaKey) {
+    clearCellSelection();
+  }
+
+  toggleCellSelection(td);
+  activeCell = td;
+  activeTable = td.closest("table");
+});
+
+
+
+
+function toggleCellSelection(td) {
+  if (selectedCells.has(td)) {
+    selectedCells.delete(td);
+    td.classList.remove("cell-selected");
+  } else {
+    selectedCells.add(td);
+    td.classList.add("cell-selected");
+  }
+}
+
+function clearCellSelection() {
+  selectedCells.forEach(td => td.classList.remove("cell-selected"));
+  selectedCells.clear();
+}
+
+
+
+
+// 水平合併（同一列）
+function mergeSelectedCells() {
+  if (selectedCells.size < 2) {
+    alert("請選取多個儲存格");
+    return;
+  }
+
+  const cells = Array.from(selectedCells);
+  const row = cells[0].parentElement;
+
+  if (!cells.every(c => c.parentElement === row)) {
+    alert("僅支援同一列合併");
+    return;
+  }
+
+  const first = cells[0];
+  first.colSpan = cells.length;
+  cells.slice(1).forEach(c => c.remove());
+
+  clearCellSelection();
+}
+
+
+// 垂直合併（最小可用版本）
+function mergeSelectedCellsVertical() {
+  if (selectedCells.size < 2) {
+    alert("請選取多個儲存格");
+    return;
+  }
+
+  const cells = Array.from(selectedCells);
+  const colIndex = cells[0].cellIndex;
+
+  // 必須同一欄
+  if (!cells.every(c => c.cellIndex === colIndex)) {
+    alert("請選取同一欄位的儲存格");
+    return;
+  }
+
+  // 依 rowIndex 排序
+  cells.sort((a, b) => a.parentElement.rowIndex - b.parentElement.rowIndex);
+
+  const first = cells[0];
+  first.rowSpan = cells.length;
+
+  cells.slice(1).forEach(c => c.remove());
+
+  clearCellSelection();
+}
+
+
+
+
+
+// 分割（針對 activeCell）
+function splitCell(cell) {
+  const span = cell.colSpan || 1;
+  if (span <= 1) return;
+
+  cell.colSpan = 1;
+
+  for (let i = 1; i < span; i++) {
+    const td = document.createElement("td");
+    td.contentEditable = "true";
+    td.style.border = "1px solid #ccc";
+    td.style.padding = "6px";
+    cell.parentElement.insertBefore(td, cell.nextSibling);
+  }
+}
+
+
+function deleteSelectedCells() {
+  if (selectedCells.size === 0) return;
+
+  selectedCells.forEach(td => td.remove());
+  clearCellSelection();
+}
+
+
+
+// Enter / Tab 行為（像 Excel）
+contentI.addEventListener("keydown", e => {
+
+  /* ================= Undo / Redo（最高優先） ================= */
+  if (e.ctrlKey || e.metaKey) {
+    const key = e.key.toLowerCase();
+
+    // Ctrl + Z（Undo）
+    if (key === "z" && !e.shiftKey) {
+      e.preventDefault();
+      if (!undoStack.length) return;
+
+      redoStack.push(contentI.innerHTML);
+      contentI.innerHTML = undoStack.pop();
+      placeCaretAtEnd(contentI);
+      return;
+    }
+
+    // Ctrl + Shift + Z / Ctrl + Y（Redo）
+    if (key === "y" || (key === "z" && e.shiftKey)) {
+      e.preventDefault();
+      if (!redoStack.length) return;
+
+      undoStack.push(contentI.innerHTML);
+      contentI.innerHTML = redoStack.pop();
+      placeCaretAtEnd(contentI);
+      return;
+    }
+  }
+
+
+function placeCaretAtEnd(el) {
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+
+  /* ================= 表格快捷（次優先） ================= */
+  if (!activeCell) return;
+
+  // ---------- Tab：同列往右 ----------
+  if (e.key === "Tab") {
+    e.preventDefault();
+
+    const next = activeCell.nextElementSibling;
+    if (next) {
+      placeCaretInsideCell(next);
+      activeCell = next;
+    }
+    return;
+  }
+
+  // ---------- Enter：同欄往下 ----------
+  if (e.key === "Enter") {
+    e.preventDefault();
+
+    const row = activeCell.parentElement;
+    const idx = activeCell.cellIndex;
+    const nextRow = row.nextElementSibling;
+
+    if (nextRow && nextRow.cells[idx]) {
+      const target = nextRow.cells[idx];
+      placeCaretInsideCell(target);
+      activeCell = target;
+    }
+    return;
+  }
+});
+
+
+
+// 在「點擊 td」時同步 activeCell
+contentI.addEventListener("focusin", e => {
+  const td = e.target.closest("td");
+  if (!td) return;
+  activeCell = td;
+  activeTable = td.closest("table");
+});
+
+
+// =================================================================
+
+//加入Undo / Redo（Ctrl + Z） 
+//加入可以用鼠標表格整體選取/ 複製 / 
+//加入拖曳欄線調整欄寬 / 列高
+
+let undoStack = [];
+let redoStack = [];
+const MAX_HISTORY = 50;
+
+function saveHistory() {
+  const html = contentI.innerHTML;
+  if (undoStack.length && undoStack[undoStack.length - 1] === html) return;
+
+  undoStack.push(html);
+
+  if (undoStack.length > MAX_HISTORY) {
+    undoStack.shift();
+  }
+  redoStack.length = 0;
+}
+
+
+let historyTimer = null;
+
+contentI.addEventListener("input", () => {
+  clearTimeout(historyTimer);
+  historyTimer = setTimeout(() => {
+    saveHistory();
+  }, 300);
+});
+
+
+function addColumnResizers(table) {
+  table.querySelectorAll("td").forEach(td => {
+    if (td.querySelector(".col-resizer")) return;
+
+    const grip = document.createElement("div");
+    grip.className = "col-resizer";
+    td.appendChild(grip);
+
+    grip.addEventListener("pointerdown", startResizeColumn);
+  });
+}
+
+let resizingCol = null;
+let startX = 0;
+let startWidth = 0;
+
+function startResizeColumn(e) {
+  e.preventDefault();
+  resizingCol = e.target.parentElement;
+  startX = e.clientX;
+  startWidth = resizingCol.offsetWidth;
+
+  document.addEventListener("pointermove", resizeColumn);
+  document.addEventListener("pointerup", stopResizeColumn);
+}
+
+function resizeColumn(e) {
+  if (!resizingCol) return;
+  const dx = e.clientX - startX;
+  resizingCol.style.width = startWidth + dx + "px";
+}
+
+function stopResizeColumn() {
+  document.removeEventListener("pointermove", resizeColumn);
+  document.removeEventListener("pointerup", stopResizeColumn);
+  resizingCol = null;
+
+  contentI.dispatchEvent(new Event("input")); // 🔥 存歷史
+}
+
+
+
+// =================================================================
+
+
+
 function insertImage(){
   document.getElementById("imgPicker").click();
 }
@@ -528,22 +1647,15 @@ imgPicker.onchange = e=>{
     img.style.maxWidth = "100%";
     img.style.display = "block";
     img.style.margin = "5px 0";
-
-    const sel = window.getSelection();
-    if(!sel.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    range.insertNode(img);
-    range.collapse(false);
-
-    const br = document.createElement("br");
-    range.insertNode(br);
+    insertNodeAtCursor(img);
+// 🔥 強制觸發自動儲存
+contentI.dispatchEvent(new Event("input"));
   };
   reader.readAsDataURL(file);
 };
 
-
-
-/* ========= 插入影片 ========= */
+// 3. 插入影片時初始縮小顯示
+// 3. 插入影片時初始縮小顯示（放大版）
 function insertVideo(){
   const input = document.createElement("input");
   input.type = "file";
@@ -552,29 +1664,194 @@ function insertVideo(){
 
   input.onchange = e => {
     const file = e.target.files[0];
-    if(!file) return;
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = () => {
       const video = document.createElement("video");
       video.src = reader.result;
       video.controls = true;
-      video.style.maxWidth = "100%";
+      video.muted = true;
+
+      // ✅ 初始尺寸（再放大一點）
+video.style.width = "160px";
+video.style.height = "auto";
+video.style.maxHeight = "160px";
+video.style.objectFit = "cover";
+
+
       video.style.display = "block";
-      video.style.margin = "5px 0";
+      video.style.margin = "10px 0";
 
-      const sel = window.getSelection();
-      if(!sel.rangeCount) return;
+      // ✅ 避免游標跑進影片
+      video.setAttribute("contenteditable", "false");
 
-      const range = sel.getRangeAt(0);
-      range.insertNode(video);
-      range.collapse(false);
-
-      const br = document.createElement("br");
-      range.insertNode(br);
+      // ✅ 插入在游標位置
+      insertNodeAtCursor(video);
+// 🔥 強制觸發自動儲存
+contentI.dispatchEvent(new Event("input"));
     };
     reader.readAsDataURL(file);
   };
+}
+
+
+
+
+
+//  自動儲存改成「用 currentId 存」
+let autoSaveTimer = null;
+
+function bindAutoSave(editorEl) {
+  editorEl.oninput = () => {
+    if (!currentId) return;
+
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(async () => {
+      const notes = await all();
+      const note = notes.find(n => n.id === currentId);
+      if (!note || note.encrypted) return;
+
+      note.content = editorEl.innerHTML;
+      note.timestamp = Date.now();
+      save(note);
+      refresh();
+
+      console.log("📝 自動儲存", currentId);
+    }, 600);
+  };
+}
+
+
+
+
+
+
+// 設置編輯區功能
+function setupEditor() {
+  initEditor(); // 啟動編輯區自動儲存功能
+
+  // 插入表格
+  const insertTableButton = document.createElement('button');
+  insertTableButton.innerText = '插入表格';
+  insertTableButton.addEventListener('click', insertTable);
+  document.body.appendChild(insertTableButton);
+
+
+  // 插入影片
+  const insertVideoButton = document.createElement('button');
+  insertVideoButton.innerText = '插入影片';
+  insertVideoButton.addEventListener('click', function() {
+    const videoUrl = prompt('請輸入影片URL：');
+    insertVideo(videoUrl);
+  });
+  document.body.appendChild(insertVideoButton);
+}
+
+// 初始化編輯區
+//setupEditor();
+
+
+/* ========= 從筆記內容抓「第一個媒體」 ========= */
+
+function extractPreviewFromHTML(html){
+  const div = document.createElement("div");
+  div.innerHTML = html || "";
+
+  const img = div.querySelector("img");
+  if(img){
+    return { type:"image", src: img.src };
+  }
+
+  const video = div.querySelector("video");
+  if(video){
+    return { type:"video", src: video.src };
+  }
+
+  const table = div.querySelector("table");
+  if(table){
+    return { type:"table" };
+  }
+
+  return null;
+}
+
+
+
+
+
+/* ========= 列表只依「文字段落」判斷行數 ========= */
+function extractTextLinesFromHTMLWithMedia(html){
+  const div = document.createElement("div");
+  div.innerHTML = html || "";
+
+  const firstImage = div.querySelector("img");
+  const firstVideo = div.querySelector("video");
+  const firstTable = div.querySelector("table");
+
+  let firstMedia = firstImage || firstVideo || firstTable || null;
+
+  // 移除不該影響行數的元素
+  div.querySelectorAll("img, video, table").forEach(el => el.remove());
+
+  const lines = [];
+  div.childNodes.forEach(node=>{
+    let text = "";
+    if(node.nodeType === Node.TEXT_NODE){
+      text = node.textContent.trim();
+    } else if(node.nodeType === Node.ELEMENT_NODE){
+      text = node.innerText.trim();
+    }
+    if(text) lines.push(text);
+  });
+
+  return {
+    lines,
+    hasImage: !!firstImage,
+    hasVideo: !!firstVideo,
+    firstMedia
+  };
+}
+
+
+
+
+/* ========= 工具函式 ========= */
+function insertHTMLAtCursor(html){
+  const sel = window.getSelection();
+  if(!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const frag = document.createRange().createContextualFragment(html);
+  range.insertNode(frag);
+  range.collapse(false);
+}
+
+function insertNodeAtCursor(node) {
+  const sel = window.getSelection();
+
+  if (savedRange) {
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+  }
+
+  if (!sel.rangeCount) {
+    contentI.appendChild(node);
+    return;
+  }
+
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(node);
+
+  // 插入後游標移到元素後面
+  range.setStartAfter(node);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // 更新 savedRange
+  savedRange = range;
 }
 
 
@@ -697,22 +1974,107 @@ function addSwipeListeners(item, note){
 
 })();
 
+function closeEditor(){
+  // 🔹 隱藏編輯器
+  editor.style.display = "none";
+
+  // 🔹 顯示列表、FAB、搜尋框
+  document.getElementById("noteList").style.display = "";
+  document.getElementById("fab").style.display = "";
+  document.getElementById("searchBox").style.display = "";
+
+  // 🔹 清空編輯器內容與選取範圍（避免上一次選取影響）
+  // 注意：不清 contentI.value，保留原筆記內容
+  window.getSelection().removeAllRanges();
+
+  // 🔹 清空 contenteditable 的臨時插入元素（圖片 / 影片）
+  // 如果你使用 contenteditable div，建議不要保留之前插入的元素
+  const contentDiv = document.getElementById("content");
+  if(contentDiv){
+    // 保存內容到筆記前，不清掉；只是切換筆記時清掉
+    contentDiv.innerHTML = "";
+  }
+
+  // 🔹 重置 global currentId，避免影響下一筆編輯
+  currentId = null;
+}
+
+/* ========= 時間顯示工具函式 ========= */
+function formatListTime(ts){
+  const d = new Date(ts);
+  const now = new Date();
+
+  const sameDay = (a,b)=>
+    a.getFullYear()===b.getFullYear() &&
+    a.getMonth()===b.getMonth() &&
+    a.getDate()===b.getDate();
+
+  if(sameDay(d, now)){
+    return d.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+  }
+
+  const y = new Date(now);
+  y.setDate(now.getDate()-1);
+  if(sameDay(d, y)){
+    return d.toLocaleDateString("zh-TW");
+  }
+
+  const diff = Math.floor((now - d) / 86400000);
+  if(diff < 7){
+    return ["日","一","二","三","四","五","六"][d.getDay()];
+  }
+
+  return d.getFullYear()+"年";
+}
+
+
+
+document.getElementById("mediaMenu").onclick = e => {
+  if (!activeMedia) return;
+
+  const act = e.target.dataset.act;
+  const cur = activeMedia.offsetWidth;
+
+  if (act === "zoomIn") {
+    activeMedia.style.width = cur + 20 + "px";
+  }
+
+  if (act === "zoomOut") {
+    activeMedia.style.width = Math.max(60, cur - 20) + "px";
+  }
+
+  if (act === "delete") {
+    activeMedia.remove();
+  }
+
+  contentI.dispatchEvent(new Event("input"));
+};
+
+
+
+
+
+
+
 
 
 /* ========= Search ========= */
-document.getElementById("searchBox").addEventListener("input", async e=>{
-  const q = e.target.value.toLowerCase();
-  const ns = await all();
-  list.innerHTML = "";
-  ns.filter(n =>
-    typeof n.content === "string" &&
-    n.content.toLowerCase().includes(q)
-  ).forEach(renderNote);
+
+let isSearching = false;
+
+let searchTimer = null;
+const SEARCH_DELAY = 250; // ms，可自行調整
+
+
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+
+  isSearching = searchInput.value.trim() !== "";
+
+  searchTimer = setTimeout(() => {
+    refresh();
+  }, SEARCH_DELAY);
 });
-
-
-// 🔹 初始化時綁一次搜尋事件
-searchInput.addEventListener("input", refresh);
 
 // 🔹 最後啟動 DB 並刷新列表
 openDB().then(refresh);
