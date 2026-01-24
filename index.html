@@ -1421,12 +1421,7 @@ contentI.addEventListener("touchstart", e => {
 });
 
 
-  // ⭐ 短按：先清掉之前選取，只選這一格
-  clearCellSelection();
-  td.classList.add("selected");
-  anchorCell = td;
-  activeCell = td;
-});
+
 
 contentI.addEventListener("touchend", () => {
   clearTimeout(longPressTimer);
