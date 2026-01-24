@@ -1192,11 +1192,10 @@ contentI.addEventListener("contextmenu", e => {
 
 
 // 點空白處關閉所有選單
-document.addEventListener("click", e => {
-  if (e.target.closest("#tableMenu")) return;
+document.addEventListener("click", () => {
   document.getElementById("tableMenu").style.display = "none";
+  document.getElementById("mediaMenu").style.display = "none";
 });
-
 
 
 
@@ -1404,63 +1403,28 @@ contentI.addEventListener("focus", () => {
 // ========手機版本功能========== 關鍵改法:加入「長按 = 右鍵」======================
 // ===== 新增「長按偵測」 (只給手機用)=====
 // ===== 加在JS全域 (只要一次)=====
-
-let longPressTimer = null;
-const LONG_PRESS_TIME = 500; // ms
-
 // ===== 在content1加入touch支援=====
 // ===== touchstart:開始長按計時=====
 
-
-let touchDragStartCell = null;
-let isTouchDragging = false;
+let longPressTimer = null;
+const LONG_PRESS_TIME = 500;
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  // === 初始化狀態 ===
-  isTouchDragging = false;
-  touchDragStartCell = td;
-
-  // ⭐ 單指點擊：先清 selection，只選這一格
-  clearCellSelection();
-  td.classList.add("selected");
-  anchorCell = td;
-  activeCell = td;
-
-  // === 長按 → 右鍵選單 ===
   longPressTimer = setTimeout(() => {
-    e.preventDefault();
     handleTableContextMenu(e, td);
   }, LONG_PRESS_TIME);
 });
 
-contentI.addEventListener("touchmove", e => {
-  if (!touchDragStartCell) return;
-
-  // ⭐ 一旦移動，就不是長按
-  isTouchDragging = true;
+contentI.addEventListener("touchmove", () => {
   clearTimeout(longPressTimer);
-
-  const touch = e.touches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  const td = el?.closest("td.data-cell");
-  if (!td) return;
-
-  // ⭐ 拖曳矩形選取
-  clearCellSelection();
-  selectRect(touchDragStartCell, td);
 });
 
 contentI.addEventListener("touchend", () => {
   clearTimeout(longPressTimer);
-
-  touchDragStartCell = null;
-  isTouchDragging = false;
 });
-
-
 
 
 // ===== 把「右鍵邏輯」抽成共用function=====
@@ -1468,7 +1432,6 @@ contentI.addEventListener("touchend", () => {
 
 function handleTableContextMenu(e, td) {
   e.preventDefault();
-  e.stopPropagation(); // ⭐ 必加，防止被 document click 關掉
 
   activeTable = td.closest("table");
   activeMedia = null;
@@ -1559,43 +1522,40 @@ function selectRect(cellA, cellB) {
 }
 
 
+let isTouchDragging = false;
 
 contentI.addEventListener("pointerdown", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
-
-  // 右鍵不處理
   if (e.button === 2) return;
 
-  // ✨ 只有「準備拖曳」才阻止
-  if (e.shiftKey || e.ctrlKey || e.metaKey) {
-    e.preventDefault();
-  }
+  isDragging = true;
+  isTouchDragging = false;
 
-  clearCellSelection();
-  td.classList.add("selected");
-
+  clearCellSelection();          // ⭐ 關鍵：先清
+  td.classList.add("selected");  // 只留一格
   anchorCell = td;
   dragStartCell = td;
-  isDragging = true;
 });
 
 
 contentI.addEventListener("pointermove", e => {
   if (!isDragging) return;
-
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
+  isTouchDragging = true; // ⭐ 只有移動才算多選
   clearCellSelection();
   selectRect(dragStartCell, td);
 });
+
 
 
 document.addEventListener("pointerup", () => {
   isDragging = false;
   dragStartCell = null;
 });
+
 
 
 
