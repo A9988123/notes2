@@ -1330,12 +1330,11 @@ function changeFontSize(increase=true){
 function insertTable(rows = 5, cols = 5) {
   const wrapper = document.createElement("div");
   wrapper.className = "table-scroll-wrapper";
-  wrapper.style.overflow = "auto";       // 滾動
-  wrapper.style.position = "relative";   // 固定用
+  wrapper.style.overflow = "auto"; // ✅ 手機可左右滑動
 
   const table = document.createElement("table");
   table.className = "note-table";
-  table.setAttribute("contenteditable", "false");
+  table.setAttribute("contenteditable", "false"); // table 整體不可編輯
   table.style.borderCollapse = "collapse";
   table.style.margin = "8px 0";
 
@@ -1347,40 +1346,28 @@ function insertTable(rows = 5, cols = 5) {
       td.style.border = "1px solid #ccc";
       td.style.minWidth = "80px";
       td.style.height = "32px";
-      td.style.boxSizing = "border-box"; // 🔑 防止高度被撐開
+      td.style.padding = "4px";
 
       if (r === 0 && c === 0) {
         td.className = "corner-cell";
         td.contentEditable = "false";
-        td.innerHTML = "";
-        td.style.position = "sticky";
-        td.style.top = "0";
-        td.style.left = "0";
-        td.style.background = "#f5f5f5";
-        td.style.zIndex = "3";
-      } 
-      else if (r === 0) {
+      } else if (r === 0) {
         td.className = "col-header";
         td.contentEditable = "false";
-        td.innerHTML = String.fromCharCode(64 + c); // A B C
-        td.style.position = "sticky";
-        td.style.top = "0";
-        td.style.background = "#f5f5f5";
-        td.style.zIndex = "2";
-      } 
-      else if (c === 0) {
+        td.innerText = String.fromCharCode(64 + c);
+      } else if (c === 0) {
         td.className = "row-header";
         td.contentEditable = "false";
-        td.innerHTML = r;
-        td.style.position = "sticky";
-        td.style.left = "0";
-        td.style.background = "#f5f5f5";
-        td.style.zIndex = "2";
-      } 
-      else {
+        td.innerText = r;
+      } else {
         td.className = "data-cell";
         td.contentEditable = "true";
-        td.innerHTML = "\u200B"; // 零寬字
+        td.innerHTML = "\u200B";
+
+        // ✅ 手機點擊直接聚焦
+        td.addEventListener("touchstart", () => {
+          placeCaretInsideCell(td);
+        });
       }
 
       tr.appendChild(td);
