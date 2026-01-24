@@ -7,8 +7,27 @@
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#4A90E2">
+<meta name="format-detection" content="telephone=no,email=no,address=no,url=no">
+
 
 <style>
+
+
+/* 編輯區整體 */
+#contentI {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: none; /* 關掉長按浮層 */
+}
+
+/* 表格內儲存格 */
+.note-table td.data-cell {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+
+
 body {
   margin: 0;
   font-family: -apple-system, system-ui;
@@ -1395,14 +1414,20 @@ contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  // 多指不處理
-  if (e.touches.length > 1) return;
-
   longPressTimer = setTimeout(() => {
-    // 👉 模擬「右鍵行為」
+    e.preventDefault(); // ⚠️ 只在「真的長按成功」才阻止
     handleTableContextMenu(e, td);
-  }, LONG_PRESS_TIME);
+  }, 500);
 });
+
+contentI.addEventListener("touchend", () => {
+  clearTimeout(longPressTimer);
+});
+
+contentI.addEventListener("touchmove", () => {
+  clearTimeout(longPressTimer);
+});
+
 
 
 // ===== touchmove:手指移動->取消長按(避免誤觸)=====
@@ -1518,18 +1543,17 @@ contentI.addEventListener("pointerdown", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  // 右鍵完全放行（contextmenu 會用到）
+  // 右鍵不處理
   if (e.button === 2) return;
 
-  const table = td.closest(".note-table");
-  if (!table) return;
-
-  e.preventDefault();
-  e.stopPropagation();
+  // ✨ 只有「準備拖曳」才阻止
+  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+  }
 
   clearCellSelection();
-
   td.classList.add("selected");
+
   anchorCell = td;
   dragStartCell = td;
   isDragging = true;
@@ -1918,6 +1942,15 @@ function saveHistory() {
 let historyTimer = null;
 
 contentI.addEventListener("input", () => {
+  // ⭐⭐⭐ 關鍵 1：輸入中立刻結束任何拖曳 / 選取狀態
+  isDragging = false;
+  dragStartCell = null;
+  anchorCell = null;
+
+  // ⭐⭐⭐ 關鍵 2：不要在 input 當下清 selection（避免手機 selection 震盪）
+  // clearCellSelection(); ❌ 絕對不要在這裡呼叫
+
+  // ⭐ 原本的 debounce 儲存邏輯
   clearTimeout(historyTimer);
   historyTimer = setTimeout(() => {
     saveHistory();
