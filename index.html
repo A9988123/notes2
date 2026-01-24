@@ -1424,26 +1424,28 @@ let dragStartCell = null;
 let longPressTimer = null;
 
 // ===== touchstart: 點下去 =====
+let dragStartCell = null;
+let isDragging = false;
+
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  // 1️⃣ 記錄拖曳起點
+  // 記錄起點
   clearCellSelection();
   td.classList.add("selected");
   dragStartCell = td;
   isDragging = true;
 
-  // 2️⃣ 設置長按計時器
+  // 如果要長按彈出選單，也可以加
   longPressTimer = setTimeout(() => {
-    e.preventDefault(); // 長按成功才阻止事件
+    e.preventDefault();
     handleTableContextMenu(e, td);
-  }, 500); // 長按 500ms
+  }, 500);
 });
 
-// ===== touchmove: 手指滑動 =====
 contentI.addEventListener("touchmove", e => {
-  // 取消長按計時器，避免誤觸右鍵
+  // 取消長按計時
   clearTimeout(longPressTimer);
 
   if (!isDragging) return;
@@ -1453,24 +1455,18 @@ contentI.addEventListener("touchmove", e => {
   const td = el?.closest("td.data-cell");
 
   if (!td) {
-    // 滑出表格 → 取消拖曳
+    // 手指滑出表格 → 結束選取
     isDragging = false;
     dragStartCell = null;
-    clearCellSelection();
     return;
   }
 
-  // 只在表格內阻止頁面滾動
-  e.preventDefault();
-
-  // 清除舊選取，並選取矩形範圍
+  e.preventDefault(); // 只在表格內阻止滾動
   clearCellSelection();
   selectRect(dragStartCell, td);
 });
 
-// ===== touchend: 放開手指 =====
 contentI.addEventListener("touchend", () => {
-  // 放開就取消拖曳和長按
   isDragging = false;
   dragStartCell = null;
   clearTimeout(longPressTimer);
