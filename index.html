@@ -1414,11 +1414,13 @@ contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  longPressTimer = setTimeout(() => {
-    e.preventDefault(); // ⚠️ 只在「真的長按成功」才阻止
-    handleTableContextMenu(e, td);
-  }, 500);
+  // ⭐ 手機單點 = 單選
+  clearCellSelection();
+  td.classList.add("selected");
+  anchorCell = td;
+  activeCell = td;
 });
+
 
 
 
@@ -1543,24 +1545,20 @@ function selectRect(cellA, cellB) {
 
 
 contentI.addEventListener("pointerdown", e => {
+  // ⭐ 手機直接跳過，避免和 touchstart 打架
+  if (e.pointerType === "touch") return;
+
   const td = e.target.closest("td.data-cell");
   if (!td) return;
-
-  // 右鍵不處理
   if (e.button === 2) return;
-
-  // ✨ 只有「準備拖曳」才阻止
-  if (e.shiftKey || e.ctrlKey || e.metaKey) {
-    e.preventDefault();
-  }
 
   clearCellSelection();
   td.classList.add("selected");
-
   anchorCell = td;
   dragStartCell = td;
   isDragging = true;
 });
+
 
 
 contentI.addEventListener("pointermove", e => {
@@ -2442,6 +2440,30 @@ searchInput.addEventListener("input", () => {
     refresh();
   }, SEARCH_DELAY);
 });
+
+
+const fab = document.getElementById("fab");
+let fabLock = false;
+
+if (fab) {
+  fab.addEventListener("pointerup", e => {
+    // ⭐ 只處理手指 / 滑鼠放開
+    e.stopPropagation();
+    e.preventDefault();
+
+    // ⭐ 防止 inline onclick + pointerup 連續觸發
+    if (fabLock) return;
+    fabLock = true;
+
+    newNote();
+
+    setTimeout(() => {
+      fabLock = false;
+    }, 300);
+  });
+}
+
+
 
 // 🔹 最後啟動 DB 並刷新列表
 openDB().then(refresh);
