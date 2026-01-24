@@ -1394,6 +1394,7 @@ let dragStartCell = null;
 let isDragging = false;
 let longPressTimer = null;
 let isLongPress = false;
+
 const LONG_PRESS_TIME = 500; // ms
 
 function resetTableSelectionState() {
@@ -1407,6 +1408,82 @@ function resetTableSelectionState() {
 contentI.addEventListener("focus", () => {
   resetTableSelectionState();
 });
+
+
+// ===== touchstart (不選、不亮、只準備)=====手機版
+
+if (isTouchDevice) {
+  contentI.addEventListener("touchstart", e => {
+    const td = e.target.closest("td.data-cell");
+    if (!td) return;
+
+    isDragging = false;
+    isLongPress = false;
+
+    // ⏱ 準備長按（只負責開選單）
+    longPressTimer = setTimeout(() => {
+      isLongPress = true;
+
+      // ⚠️ 長按：不改 selection
+      showTableMenuAt(
+        e.touches[0].pageX,
+        e.touches[0].pageY
+      );
+    }, 500);
+  });
+}
+
+// ===== touchmove (唯一會改 seleciion的地方)=====手機版
+
+if (isTouchDevice) {
+  contentI.addEventListener("touchmove", e => {
+    const td = e.target.closest("td.data-cell");
+    if (!td) return;
+
+    clearTimeout(longPressTimer); // 一動就不是長按
+
+    if (!isDragging) {
+      isDragging = true;
+      clearCellSelection();
+      dragStartCell = td;
+      anchorCell = td;
+    }
+
+    clearCellSelection();
+    selectRect(dragStartCell, td);
+
+    e.preventDefault(); // 只在 move 阻止
+  });
+}
+
+
+// ===== touchend (決定是「點」還是「拖」)=====手機版
+
+
+if (isTouchDevice) {
+  contentI.addEventListener("touchend", e => {
+    clearTimeout(longPressTimer);
+
+    // 👉 長按結束，不動 selection
+    if (isLongPress) {
+      isDragging = false;
+      return;
+    }
+
+    // 👉 沒拖曳 = 單點
+    if (!isDragging) {
+      const td = e.target.closest("td.data-cell");
+      if (!td) return;
+
+      clearCellSelection();
+      td.classList.add("selected");
+      anchorCell = td;
+    }
+
+    isDragging = false;
+    dragStartCell = null;
+  });
+}
 
 
 
@@ -1593,6 +1670,15 @@ function selectRect(cellA, cellB) {
 }
 
 
+/*=====  有手機上:全面停用pointer選取邏輯=========
+在手機上，這些一定不能存在
+桌機可以用
+手機請交給touch
+
+contentI.addEventListener("pointerdown", ...)
+contentI.addEventListener("pointermove", ...)
+document.addEventListener("pointerup", ...)
+
 
 contentI.addEventListener("pointerdown", e => {
   const td = e.target.closest("td.data-cell");
@@ -1631,8 +1717,11 @@ document.addEventListener("pointerup", () => {
   dragStartCell = null;
 });
 
+==================================================*/
+// =====加一個「是否手機」的判斷(一次就好) =====
 
-
+const isTouchDevice =
+  "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
 
 
