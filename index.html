@@ -1206,46 +1206,38 @@ document.getElementById("tableMenu").onclick = e => {
 
   let didAction = false;
 
-  const selectedCells = getSelectedDataCells();
-
-  // ---------- 合併（以 selected 為準） ----------
+  // 👉 合併（使用 selected cells）
   if (act === "merge") {
-    if (selectedCells.length >= 2) {
-      mergeSelectedCells();
-      didAction = true;
-    }
+    mergeSelectedCells();
+    didAction = true;
   }
 
-  // ---------- 分割（以第一個 selected 或 activeCell） ----------
+  // 👉 分割（仍以 activeCell 為主）
   if (act === "split") {
-    const target = selectedCells[0] || activeCell;
-    if (target) {
-      splitCell(target);
+    if (activeCell) {
+      splitCell(activeCell);
       didAction = true;
     }
   }
 
-  // ---------- 刪除（selected 為主） ----------
+  // 👉 刪除（selected 為主）
   if (act === "delete") {
-    if (selectedCells.length > 0) {
-      deleteSelectedCells();
-      didAction = true;
-    }
+    deleteSelectedCells();
+    didAction = true;
   }
 
-  // ---------- 插入列 / 欄（需要一個定位點） ----------
+  // ---------- 插入列 / 欄（需要 activeCell） ----------
   if (
     act === "add-col-left" ||
     act === "add-col-right" ||
     act === "add-row-up" ||
     act === "add-row-down"
   ) {
-    const baseCell = selectedCells[0] || activeCell;
-    if (!baseCell) return;
+    if (!activeCell) return;
 
-    const table = baseCell.closest("table");
-    const col = baseCell.cellIndex;
-    const row = baseCell.parentElement.rowIndex;
+    const table = activeCell.closest("table");
+    const col = activeCell.cellIndex;
+    const row = activeCell.parentElement.rowIndex;
 
     if (act === "add-col-left") addColumn(table, col);
     if (act === "add-col-right") addColumn(table, col + 1);
@@ -1258,8 +1250,9 @@ document.getElementById("tableMenu").onclick = e => {
     didAction = true;
   }
 
-  // ✅ 只做儲存，不清 selection
+  // ⭐ 只有真的「改動表格」才 reset
   if (didAction) {
+    resetTableSelectionState();
     contentI.dispatchEvent(new Event("input"));
   }
 };
@@ -1390,12 +1383,8 @@ function insertTable(rows = 5, cols = 5) {
 
 // ===== 啟用表格選取功能 =====
 let anchorCell = null;
-let dragStartCell = null;
 let isDragging = false;
-let longPressTimer = null;
-let isLongPress = false;
-
-const LONG_PRESS_TIME = 500; // ms
+let dragStartCell = null;
 
 function resetTableSelectionState() {
   anchorCell = null;
@@ -1410,154 +1399,33 @@ contentI.addEventListener("focus", () => {
 });
 
 
-// ===== touchstart (不選、不亮、只準備)=====手機版
-
-if (isTouchDevice) {
-  contentI.addEventListener("touchstart", e => {
-    const td = e.target.closest("td.data-cell");
-    if (!td) return;
-
-    isDragging = false;
-    isLongPress = false;
-
-    // ⏱ 準備長按（只負責開選單）
-    longPressTimer = setTimeout(() => {
-      isLongPress = true;
-
-      // ⚠️ 長按：不改 selection
-      showTableMenuAt(
-        e.touches[0].pageX,
-        e.touches[0].pageY
-      );
-    }, 500);
-  });
-}
-
-// ===== touchmove (唯一會改 seleciion的地方)=====手機版
-
-if (isTouchDevice) {
-  contentI.addEventListener("touchmove", e => {
-    const td = e.target.closest("td.data-cell");
-    if (!td) return;
-
-    clearTimeout(longPressTimer); // 一動就不是長按
-
-    if (!isDragging) {
-      isDragging = true;
-      clearCellSelection();
-      dragStartCell = td;
-      anchorCell = td;
-    }
-
-    clearCellSelection();
-    selectRect(dragStartCell, td);
-
-    e.preventDefault(); // 只在 move 阻止
-  });
-}
-
-
-// ===== touchend (決定是「點」還是「拖」)=====手機版
-
-
-if (isTouchDevice) {
-  contentI.addEventListener("touchend", e => {
-    clearTimeout(longPressTimer);
-
-    // 👉 長按結束，不動 selection
-    if (isLongPress) {
-      isDragging = false;
-      return;
-    }
-
-    // 👉 沒拖曳 = 單點
-    if (!isDragging) {
-      const td = e.target.closest("td.data-cell");
-      if (!td) return;
-
-      clearCellSelection();
-      td.classList.add("selected");
-      anchorCell = td;
-    }
-
-    isDragging = false;
-    dragStartCell = null;
-  });
-}
-
-
 
 // ========手機版本功能========== 關鍵改法:加入「長按 = 右鍵」======================
 // ===== 新增「長按偵測」 (只給手機用)=====
 // ===== 加在JS全域 (只要一次)=====
 
-
+let longPressTimer = null;
+const LONG_PRESS_TIME = 500; // ms
 
 // ===== 在content1加入touch支援=====
-// ===== touchstart:開始長按計時 更新後 不要立刻選取=====
+// ===== touchstart:開始長按計時=====
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  isLongPress = false;
-
-  // ⏱ 長按判斷（只負責開選單）
   longPressTimer = setTimeout(() => {
-    isLongPress = true;
-
-    // ⚠️ 長按時「不改 selection」
-    showTableMenuAt(e.touches[0].pageX, e.touches[0].pageY);
+    e.preventDefault(); // ⚠️ 只在「真的長按成功」才阻止
+    handleTableContextMenu(e, td);
   }, 500);
 });
 
-
-// touchend (決定是「點」還是拖」)
-contentI.addEventListener("touchend", e => {
+contentI.addEventListener("touchend", () => {
   clearTimeout(longPressTimer);
-
-  // 長按結束，不動 selection
-  if (isLongPress) {
-    isDragging = false;
-    return;
-  }
-
-  // 如果沒有拖曳 → 當成「單點」
-  if (!isDragging) {
-    const td = e.target.closest("td.data-cell");
-    if (!td) return;
-
-    clearCellSelection();
-    td.classList.add("selected");
-    anchorCell = td;
-  }
-
-  isDragging = false;
-  dragStartCell = null;
 });
 
-
-
-// touchmove (真正的「滑動選取」)
-contentI.addEventListener("touchmove", e => {
-  const td = e.target.closest("td.data-cell");
-  if (!td) return;
-
-  // 一移動就不是長按
+contentI.addEventListener("touchmove", () => {
   clearTimeout(longPressTimer);
-
-  // 第一次 move → 啟動拖曳選取
-  if (!isDragging) {
-    isDragging = true;
-    clearCellSelection();
-    dragStartCell = td;
-    anchorCell = td;
-  }
-
-  clearCellSelection();
-  selectRect(dragStartCell, td);
-
-  e.preventDefault(); // ⚠️ 只在 move 才阻止
 });
 
 
@@ -1670,15 +1538,6 @@ function selectRect(cellA, cellB) {
 }
 
 
-/*=====  有手機上:全面停用pointer選取邏輯=========
-在手機上，這些一定不能存在
-桌機可以用
-手機請交給touch
-
-contentI.addEventListener("pointerdown", ...)
-contentI.addEventListener("pointermove", ...)
-document.addEventListener("pointerup", ...)
-
 
 contentI.addEventListener("pointerdown", e => {
   const td = e.target.closest("td.data-cell");
@@ -1717,11 +1576,8 @@ document.addEventListener("pointerup", () => {
   dragStartCell = null;
 });
 
-==================================================*/
-// =====加一個「是否手機」的判斷(一次就好) =====
 
-const isTouchDevice =
-  "ontouchstart" in window || navigator.maxTouchPoints > 0;
+
 
 
 
