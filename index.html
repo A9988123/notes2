@@ -384,6 +384,17 @@ td.row-header:hover {
   margin-left: 6px;
 }
 
+.table-scroll-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.note-table {
+  min-width: 600px; /* 欄位多才會橫向滑 */
+}
+
 
 
 </style>
@@ -1317,6 +1328,12 @@ function changeFontSize(increase=true){
 //==== 2. 表格設置，並加入合併/分割功能====完全符合 Excel 式的表格結構
 
 function insertTable(rows = 5, cols = 5) {
+
+  // 🔹 1. 外層 wrapper（負責橫向滑動）
+  const wrapper = document.createElement("div");
+  wrapper.className = "table-scroll-wrapper";
+
+  // 🔹 2. 原本的 table（幾乎不動）
   const table = document.createElement("table");
   table.className = "note-table";
   table.setAttribute("contenteditable", "false");
@@ -1343,7 +1360,7 @@ function insertTable(rows = 5, cols = 5) {
       else if (r === 0) {
         td.className = "col-header";
         td.contentEditable = "false";
-        td.innerHTML = String.fromCharCode(64 + c); // A B C
+        td.innerHTML = String.fromCharCode(64 + c);
       }
 
       // ───── 列標題 1 2 3 ─────
@@ -1357,7 +1374,7 @@ function insertTable(rows = 5, cols = 5) {
       else {
         td.className = "data-cell";
         td.contentEditable = "true";
-        td.innerHTML = "\u200B"; // 零寬字
+        td.innerHTML = "\u200B";
       }
 
       tr.appendChild(td);
@@ -1366,18 +1383,22 @@ function insertTable(rows = 5, cols = 5) {
     table.appendChild(tr);
   }
 
-  insertNodeAtCursor(table);
+  // 🔹 3. 包進 wrapper 再插入
+  wrapper.appendChild(table);
+  insertNodeAtCursor(wrapper);
 
-  // 游標放在 A1
+  // 🔹 4. 游標放在 A1（⚠️ 要對 table，不是 wrapper）
   const firstDataCell = table.querySelector(".data-cell");
   placeCaretInsideCell(firstDataCell);
 
+  // 🔹 5. 原本功能全部保留
   enableExcelSelection(table);
   addColumnResizers(table);
   addRowResizers(table);
 
   contentI.dispatchEvent(new Event("input"));
 }
+
 
 
 
@@ -1418,8 +1439,31 @@ contentI.addEventListener("touchstart", e => {
   }, LONG_PRESS_TIME);
 });
 
-contentI.addEventListener("touchmove", () => {
+contentI.addEventListener("touchmove", e => {
+  // ───── 1. 取消長按計時器，避免誤觸右鍵
   clearTimeout(longPressTimer);
+
+  // ───── 2. 拖曳選取表格
+  if (!isDragging) return;
+
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const td = el?.closest("td.data-cell");
+
+  if (!td) {
+    // 👉 手指滑出表格 → 結束選取
+    isDragging = false;
+    dragStartCell = null;
+    clearCellSelection(); // 可選，看你要不要清掉選取
+    return;
+  }
+
+  // 👉 只在表格內才阻止頁面滾動
+  e.preventDefault();
+
+  // ───── 清除舊選取，並重新選取矩形範圍
+  clearCellSelection();
+  selectRect(dragStartCell, td);
 });
 
 contentI.addEventListener("touchend", () => {
