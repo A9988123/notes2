@@ -1206,38 +1206,46 @@ document.getElementById("tableMenu").onclick = e => {
 
   let didAction = false;
 
-  // 👉 合併（使用 selected cells）
-  if (act === "merge") {
-    mergeSelectedCells();
-    didAction = true;
-  }
+  const selectedCells = getSelectedDataCells();
 
-  // 👉 分割（仍以 activeCell 為主）
-  if (act === "split") {
-    if (activeCell) {
-      splitCell(activeCell);
+  // ---------- 合併（以 selected 為準） ----------
+  if (act === "merge") {
+    if (selectedCells.length >= 2) {
+      mergeSelectedCells();
       didAction = true;
     }
   }
 
-  // 👉 刪除（selected 為主）
-  if (act === "delete") {
-    deleteSelectedCells();
-    didAction = true;
+  // ---------- 分割（以第一個 selected 或 activeCell） ----------
+  if (act === "split") {
+    const target = selectedCells[0] || activeCell;
+    if (target) {
+      splitCell(target);
+      didAction = true;
+    }
   }
 
-  // ---------- 插入列 / 欄（需要 activeCell） ----------
+  // ---------- 刪除（selected 為主） ----------
+  if (act === "delete") {
+    if (selectedCells.length > 0) {
+      deleteSelectedCells();
+      didAction = true;
+    }
+  }
+
+  // ---------- 插入列 / 欄（需要一個定位點） ----------
   if (
     act === "add-col-left" ||
     act === "add-col-right" ||
     act === "add-row-up" ||
     act === "add-row-down"
   ) {
-    if (!activeCell) return;
+    const baseCell = selectedCells[0] || activeCell;
+    if (!baseCell) return;
 
-    const table = activeCell.closest("table");
-    const col = activeCell.cellIndex;
-    const row = activeCell.parentElement.rowIndex;
+    const table = baseCell.closest("table");
+    const col = baseCell.cellIndex;
+    const row = baseCell.parentElement.rowIndex;
 
     if (act === "add-col-left") addColumn(table, col);
     if (act === "add-col-right") addColumn(table, col + 1);
@@ -1250,9 +1258,8 @@ document.getElementById("tableMenu").onclick = e => {
     didAction = true;
   }
 
-  // ⭐ 只有真的「改動表格」才 reset
+  // ✅ 只做儲存，不清 selection
   if (didAction) {
-    resetTableSelectionState();
     contentI.dispatchEvent(new Event("input"));
   }
 };
@@ -1383,8 +1390,11 @@ function insertTable(rows = 5, cols = 5) {
 
 // ===== 啟用表格選取功能 =====
 let anchorCell = null;
-let isDragging = false;
 let dragStartCell = null;
+let isDragging = false;
+let longPressTimer = null;
+let isLongPress = false;
+const LONG_PRESS_TIME = 500; // ms
 
 function resetTableSelectionState() {
   anchorCell = null;
@@ -1404,28 +1414,73 @@ contentI.addEventListener("focus", () => {
 // ===== 新增「長按偵測」 (只給手機用)=====
 // ===== 加在JS全域 (只要一次)=====
 
-let longPressTimer = null;
-const LONG_PRESS_TIME = 500; // ms
+
 
 // ===== 在content1加入touch支援=====
-// ===== touchstart:開始長按計時=====
+// ===== touchstart:開始長按計時 更新後 不要立刻選取=====
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
+  isLongPress = false;
+
+  // ⏱ 長按判斷（只負責開選單）
   longPressTimer = setTimeout(() => {
-    e.preventDefault(); // ⚠️ 只在「真的長按成功」才阻止
-    handleTableContextMenu(e, td);
+    isLongPress = true;
+
+    // ⚠️ 長按時「不改 selection」
+    showTableMenuAt(e.touches[0].pageX, e.touches[0].pageY);
   }, 500);
 });
 
-contentI.addEventListener("touchend", () => {
+
+// touchend (決定是「點」還是拖」)
+contentI.addEventListener("touchend", e => {
   clearTimeout(longPressTimer);
+
+  // 長按結束，不動 selection
+  if (isLongPress) {
+    isDragging = false;
+    return;
+  }
+
+  // 如果沒有拖曳 → 當成「單點」
+  if (!isDragging) {
+    const td = e.target.closest("td.data-cell");
+    if (!td) return;
+
+    clearCellSelection();
+    td.classList.add("selected");
+    anchorCell = td;
+  }
+
+  isDragging = false;
+  dragStartCell = null;
 });
 
-contentI.addEventListener("touchmove", () => {
+
+
+// touchmove (真正的「滑動選取」)
+contentI.addEventListener("touchmove", e => {
+  const td = e.target.closest("td.data-cell");
+  if (!td) return;
+
+  // 一移動就不是長按
   clearTimeout(longPressTimer);
+
+  // 第一次 move → 啟動拖曳選取
+  if (!isDragging) {
+    isDragging = true;
+    clearCellSelection();
+    dragStartCell = td;
+    anchorCell = td;
+  }
+
+  clearCellSelection();
+  selectRect(dragStartCell, td);
+
+  e.preventDefault(); // ⚠️ 只在 move 才阻止
 });
 
 
