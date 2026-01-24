@@ -1192,10 +1192,11 @@ contentI.addEventListener("contextmenu", e => {
 
 
 // 點空白處關閉所有選單
-document.addEventListener("click", () => {
+document.addEventListener("click", e => {
+  if (e.target.closest("#tableMenu")) return;
   document.getElementById("tableMenu").style.display = "none";
-  document.getElementById("mediaMenu").style.display = "none";
 });
+
 
 
 
@@ -1410,37 +1411,56 @@ const LONG_PRESS_TIME = 500; // ms
 // ===== 在content1加入touch支援=====
 // ===== touchstart:開始長按計時=====
 
+
+let touchDragStartCell = null;
+let isTouchDragging = false;
+
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
+  // === 初始化狀態 ===
+  isTouchDragging = false;
+  touchDragStartCell = td;
+
+  // ⭐ 單指點擊：先清 selection，只選這一格
+  clearCellSelection();
+  td.classList.add("selected");
+  anchorCell = td;
+  activeCell = td;
+
+  // === 長按 → 右鍵選單 ===
   longPressTimer = setTimeout(() => {
-    e.preventDefault(); // ⚠️ 只在「真的長按成功」才阻止
+    e.preventDefault();
     handleTableContextMenu(e, td);
-  }, 500);
+  }, LONG_PRESS_TIME);
+});
+
+contentI.addEventListener("touchmove", e => {
+  if (!touchDragStartCell) return;
+
+  // ⭐ 一旦移動，就不是長按
+  isTouchDragging = true;
+  clearTimeout(longPressTimer);
+
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const td = el?.closest("td.data-cell");
+  if (!td) return;
+
+  // ⭐ 拖曳矩形選取
+  clearCellSelection();
+  selectRect(touchDragStartCell, td);
 });
 
 contentI.addEventListener("touchend", () => {
   clearTimeout(longPressTimer);
+
+  touchDragStartCell = null;
+  isTouchDragging = false;
 });
 
-contentI.addEventListener("touchmove", () => {
-  clearTimeout(longPressTimer);
-});
 
-
-
-// ===== touchmove:手指移動->取消長按(避免誤觸)=====
-
-contentI.addEventListener("touchmove", () => {
-  clearTimeout(longPressTimer);
-});
-
-// ===== touchend:放開->取消長按=====
-
-contentI.addEventListener("touchend", () => {
-  clearTimeout(longPressTimer);
-});
 
 
 // ===== 把「右鍵邏輯」抽成共用function=====
@@ -1448,6 +1468,7 @@ contentI.addEventListener("touchend", () => {
 
 function handleTableContextMenu(e, td) {
   e.preventDefault();
+  e.stopPropagation(); // ⭐ 必加，防止被 document click 關掉
 
   activeTable = td.closest("table");
   activeMedia = null;
