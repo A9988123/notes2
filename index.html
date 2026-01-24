@@ -147,8 +147,25 @@ header {
 
 
 .note-table td {
-  position: relative;
+  user-select: none;
 }
+
+.note-table td.data-cell {
+  user-select: text;
+}
+
+.note-table .col-header,
+.note-table .row-header {
+  background: #f2f2f2;
+  color: #666;
+  font-weight: bold;
+  text-align: center;
+}
+
+.note-table td.selected {
+  background: #cce5ff;
+}
+
 
 .col-resizer {
   position: absolute;
@@ -158,6 +175,18 @@ header {
   height: 100%;
   cursor: col-resize;
   z-index: 10;
+}
+
+
+
+td.selected {
+  background-color: rgba(0, 128, 255, 0.3); /* 整欄/整列選中效果 */
+}
+
+td.col-header:hover,
+td.row-header:hover {
+  cursor: pointer;
+  background-color: rgba(0, 128, 255, 0.1);
 }
 
 
@@ -1085,41 +1114,48 @@ let activeTable = null;
 let activeMedia = null;
 
 contentI.addEventListener("contextmenu", e => {
-  const td = e.target.closest("td");
+  const td = e.target.closest("td.data-cell");
   const media = e.target.closest("img, video");
 
-  // ---------- 表格右鍵 ----------
+  // ================= 表格右鍵 =================
   if (td) {
+    // ⭐ 完全接管右鍵行為
     e.preventDefault();
+    e.stopPropagation();
 
     activeTable = td.closest("table");
     activeMedia = null;
 
-    // ✅ 關鍵修正：
-    // 只有在「目前沒有多選」或「右鍵的格子不在選取中」時
-    // 才把它設為 activeCell 並單選
-    if (!selectedCells.has(td)) {
+    const selected = getSelectedDataCells();
+
+    // 👉 如果目前沒有任何選取，才選取右鍵那格
+    if (selected.length === 0) {
       clearCellSelection();
-      selectedCells.add(td);
-      td.classList.add("cell-selected");
-      activeCell = td;
-    } else {
-      // 多選狀態下，保留原 activeCell
-      activeCell = Array.from(selectedCells)[0];
+      td.classList.add("selected");
+      anchorCell = td;
     }
 
+    // 👉 activeCell 永遠指向 selection 的左上角（穩定）
+    const cells = getSelectedDataCells();
+    if (cells.length > 0) {
+      activeCell = cells[0];
+    }
+
+    // 顯示表格右鍵選單
     const menu = document.getElementById("tableMenu");
     menu.style.left = e.clientX + "px";
     menu.style.top = e.clientY + "px";
     menu.style.display = "block";
 
+    // 隱藏 media menu
     document.getElementById("mediaMenu").style.display = "none";
     return;
   }
 
-  // ---------- 圖片 / 影片右鍵 ----------
+  // ================= 圖片 / 影片右鍵 =================
   if (media) {
     e.preventDefault();
+    e.stopPropagation();
 
     activeMedia = media;
     activeCell = null;
@@ -1135,6 +1171,7 @@ contentI.addEventListener("contextmenu", e => {
   }
 });
 
+
 // 點空白處關閉所有選單
 document.addEventListener("click", () => {
   document.getElementById("tableMenu").style.display = "none";
@@ -1148,31 +1185,57 @@ document.getElementById("tableMenu").onclick = e => {
   const act = e.target.dataset.act;
   if (!act) return;
 
-  // 🔒 沒有 activeCell 直接略過（避免錯誤）
-  if (!activeCell) return;
+  let didAction = false;
 
-  const table = activeCell.closest("table");
-  const col = activeCell.cellIndex;
-  const row = activeCell.parentElement.rowIndex;
+  // 👉 合併（使用 selected cells）
+  if (act === "merge") {
+    mergeSelectedCells();
+    didAction = true;
+  }
 
-  // ---------- 原本功能 ----------
-  if (act === "merge") mergeSelectedCells();
-  if (act === "merge-vertical") mergeSelectedCellsVertical();
-  if (act === "split") splitCell(activeCell);
-  if (act === "delete") deleteSelectedCells();
+  // 👉 分割（仍以 activeCell 為主）
+  if (act === "split") {
+    if (activeCell) {
+      splitCell(activeCell);
+      didAction = true;
+    }
+  }
 
-  // ---------- 新增：插入欄 / 列 ----------
-  if (act === "add-col-left") addColumn(table, col);
-  if (act === "add-col-right") addColumn(table, col + 1);
-  if (act === "add-row-up") addRow(table, row);
-  if (act === "add-row-down") addRow(table, row + 1);
+  // 👉 刪除（selected 為主）
+  if (act === "delete") {
+    deleteSelectedCells();
+    didAction = true;
+  }
 
-  // 🔄 更新拖曳線（避免重複）
-  addColumnResizers(table);
-  addRowResizers(table);
+  // ---------- 插入列 / 欄（需要 activeCell） ----------
+  if (
+    act === "add-col-left" ||
+    act === "add-col-right" ||
+    act === "add-row-up" ||
+    act === "add-row-down"
+  ) {
+    if (!activeCell) return;
 
-  // 🔥 存入 Undo / AutoSave
-  contentI.dispatchEvent(new Event("input"));
+    const table = activeCell.closest("table");
+    const col = activeCell.cellIndex;
+    const row = activeCell.parentElement.rowIndex;
+
+    if (act === "add-col-left") addColumn(table, col);
+    if (act === "add-col-right") addColumn(table, col + 1);
+    if (act === "add-row-up") addRow(table, row);
+    if (act === "add-row-down") addRow(table, row + 1);
+
+    addColumnResizers(table);
+    addRowResizers(table);
+
+    didAction = true;
+  }
+
+  // ⭐ 只有真的「改動表格」才 reset
+  if (didAction) {
+    resetTableSelectionState();
+    contentI.dispatchEvent(new Event("input"));
+  }
 };
 
 
@@ -1232,49 +1295,284 @@ function changeFontSize(increase=true){
 }
 
 
-// 2. 表格設置，並加入合併/分割功能
-function insertTable(rows = 3, cols = 3) {
+//==== 2. 表格設置，並加入合併/分割功能====完全符合 Excel 式的表格結構
+
+function insertTable(rows = 5, cols = 5) {
   const table = document.createElement("table");
-
- // ⭐ 新增這裡
-  table.classList.add("note-table");
+  table.className = "note-table";
   table.setAttribute("contenteditable", "false");
-
-
   table.style.borderCollapse = "collapse";
   table.style.margin = "8px 0";
 
-  for (let r = 0; r < rows; r++) {
+  for (let r = 0; r <= rows; r++) {
     const tr = document.createElement("tr");
 
-    for (let c = 0; c < cols; c++) {
+    for (let c = 0; c <= cols; c++) {
       const td = document.createElement("td");
-      td.contentEditable = "true";
       td.style.border = "1px solid #ccc";
-      td.style.padding = "8px 10px";
       td.style.minWidth = "80px";
-      td.style.minHeight = "36px"; // ⭐ 關鍵
-      td.innerHTML = "\u200B";     // ⭐ 關鍵（零寬字）
+      td.style.height = "32px";
+
+      // ───── 左上角（空白）─────
+      if (r === 0 && c === 0) {
+        td.className = "corner-cell";
+        td.contentEditable = "false";
+        td.innerHTML = "";
+      }
+
+      // ───── 欄標題 A B C ─────
+      else if (r === 0) {
+        td.className = "col-header";
+        td.contentEditable = "false";
+        td.innerHTML = String.fromCharCode(64 + c); // A B C
+      }
+
+      // ───── 列標題 1 2 3 ─────
+      else if (c === 0) {
+        td.className = "row-header";
+        td.contentEditable = "false";
+        td.innerHTML = r;
+      }
+
+      // ───── 真正資料格（A1 開始）─────
+      else {
+        td.className = "data-cell";
+        td.contentEditable = "true";
+        td.innerHTML = "\u200B"; // 零寬字
+      }
 
       tr.appendChild(td);
     }
+
     table.appendChild(tr);
   }
 
   insertNodeAtCursor(table);
 
-  // ✅ 游標正確進第一格
-  const firstCell = table.querySelector("td");
-  placeCaretInsideCell(firstCell);
+  // 游標放在 A1
+  const firstDataCell = table.querySelector(".data-cell");
+  placeCaretInsideCell(firstDataCell);
+
+  enableExcelSelection(table);
+  addColumnResizers(table);
+  addRowResizers(table);
 
   contentI.dispatchEvent(new Event("input"));
-
-
-  // ⭐ 一定要在插入 DOM 之後
-  addColumnResizers(table);
-  addRowResizers(table); // 如果你也有列高拖曳
-
 }
+
+
+
+// ===== 啟用表格選取功能 =====
+let anchorCell = null;
+let isDragging = false;
+let dragStartCell = null;
+
+function resetTableSelectionState() {
+  anchorCell = null;
+  dragStartCell = null;
+  isDragging = false;
+  clearCellSelection();
+}
+
+
+contentI.addEventListener("focus", () => {
+  resetTableSelectionState();
+});
+
+
+
+// ========手機版本功能========== 關鍵改法:加入「長按 = 右鍵」======================
+// ===== 新增「長按偵測」 (只給手機用)=====
+// ===== 加在JS全域 (只要一次)=====
+
+let longPressTimer = null;
+const LONG_PRESS_TIME = 500; // ms
+
+// ===== 在content1加入touch支援=====
+// ===== touchstart:開始長按計時=====
+
+contentI.addEventListener("touchstart", e => {
+  const td = e.target.closest("td.data-cell");
+  if (!td) return;
+
+  // 多指不處理
+  if (e.touches.length > 1) return;
+
+  longPressTimer = setTimeout(() => {
+    // 👉 模擬「右鍵行為」
+    handleTableContextMenu(e, td);
+  }, LONG_PRESS_TIME);
+});
+
+
+// ===== touchmove:手指移動->取消長按(避免誤觸)=====
+
+contentI.addEventListener("touchmove", () => {
+  clearTimeout(longPressTimer);
+});
+
+// ===== touchend:放開->取消長按=====
+
+contentI.addEventListener("touchend", () => {
+  clearTimeout(longPressTimer);
+});
+
+
+// ===== 把「右鍵邏輯」抽成共用function=====
+// =====新增這個function (桌機/手機共用)=====
+
+function handleTableContextMenu(e, td) {
+  e.preventDefault();
+
+  activeTable = td.closest("table");
+  activeMedia = null;
+
+  const selected = getSelectedDataCells();
+
+  // 沒有 selection 才選取這一格
+  if (selected.length === 0) {
+    clearCellSelection();
+    td.classList.add("selected");
+    anchorCell = td;
+  }
+
+  activeCell = getSelectedDataCells()[0] || td;
+
+  const menu = document.getElementById("tableMenu");
+
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+  menu.style.display = "block";
+
+  document.getElementById("mediaMenu").style.display = "none";
+}
+
+// ===== 桌機的contextmenu 改成「呼叫共函式」=====
+// =====更新你的contextmenu (重點)=====
+
+contentI.addEventListener("contextmenu", e => {
+  const td = e.target.closest("td.data-cell");
+  const media = e.target.closest("img, video");
+
+  if (td) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleTableContextMenu(e, td);
+    return;
+  }
+
+  if (media) {
+    e.preventDefault();
+    activeMedia = media;
+    activeCell = null;
+    activeTable = null;
+
+    const menu = document.getElementById("mediaMenu");
+    menu.style.left = e.clientX + "px";
+    menu.style.top = e.clientY + "px";
+    menu.style.display = "block";
+
+    document.getElementById("tableMenu").style.display = "none";
+  }
+});
+
+
+//==========================================================================================
+
+
+
+
+
+
+
+//  矩形選取的核心邏輯
+function selectRect(cellA, cellB) {
+  const table = cellA.closest("table");
+
+  const r1 = cellA.parentElement.rowIndex;
+  const c1 = cellA.cellIndex;
+  const r2 = cellB.parentElement.rowIndex;
+  const c2 = cellB.cellIndex;
+
+  const rMin = Math.min(r1, r2);
+  const rMax = Math.max(r1, r2);
+  const cMin = Math.min(c1, c2);
+  const cMax = Math.max(c1, c2);
+
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      const cell = table.rows[r]?.cells[c];
+      if (cell && cell.classList.contains("data-cell")) {
+        cell.classList.add("selected");
+      }
+    }
+  }
+}
+
+
+
+contentI.addEventListener("pointerdown", e => {
+  const td = e.target.closest("td.data-cell");
+  if (!td) return;
+
+  // 右鍵完全放行（contextmenu 會用到）
+  if (e.button === 2) return;
+
+  const table = td.closest(".note-table");
+  if (!table) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  clearCellSelection();
+
+  td.classList.add("selected");
+  anchorCell = td;
+  dragStartCell = td;
+  isDragging = true;
+});
+
+
+contentI.addEventListener("pointermove", e => {
+  if (!isDragging) return;
+
+  const td = e.target.closest("td.data-cell");
+  if (!td) return;
+
+  clearCellSelection();
+  selectRect(dragStartCell, td);
+});
+
+
+document.addEventListener("pointerup", () => {
+  isDragging = false;
+  dragStartCell = null;
+});
+
+
+
+
+
+
+
+
+// ===== 清除所有選取 =====
+function clearCellSelection() {
+  document
+    .querySelectorAll(".note-table td.selected")
+    .forEach(td => td.classList.remove("selected"));
+}
+
+
+
+
+//==========================================================================
+
+
+
 
 
 function addRowResizers(table) {
@@ -1381,35 +1679,75 @@ function toggleCellSelection(td) {
   }
 }
 
-function clearCellSelection() {
-  selectedCells.forEach(td => td.classList.remove("cell-selected"));
-  selectedCells.clear();
+
+
+// 取得目前選取的「資料格」
+function getSelectedDataCells() {
+  return Array.from(
+    document.querySelectorAll(".note-table td.selected.data-cell")
+  );
 }
+
+// 清除所有選取
+function clearCellSelection() {
+  document
+    .querySelectorAll(".note-table td.selected")
+    .forEach(td => td.classList.remove("selected"));
+}
+
 
 
 
 
 // 水平合併（同一列）
 function mergeSelectedCells() {
-  if (selectedCells.size < 2) {
+  const cells = getSelectedDataCells();
+  if (cells.length < 2) {
     alert("請選取多個儲存格");
     return;
   }
 
-  const cells = Array.from(selectedCells);
-  const row = cells[0].parentElement;
+  const table = cells[0].closest("table");
 
-  if (!cells.every(c => c.parentElement === row)) {
-    alert("僅支援同一列合併");
-    return;
+  // 取得所有 row / col index
+  const rows = cells.map(c => c.parentElement.rowIndex);
+  const cols = cells.map(c => c.cellIndex);
+
+  const minRow = Math.min(...rows);
+  const maxRow = Math.max(...rows);
+  const minCol = Math.min(...cols);
+  const maxCol = Math.max(...cols);
+
+  // 驗證是否為「完整矩形」
+  for (let r = minRow; r <= maxRow; r++) {
+    for (let c = minCol; c <= maxCol; c++) {
+      const cell = table.rows[r]?.cells[c];
+      if (!cell || !cell.classList.contains("data-cell")) {
+        alert("選取範圍必須是完整矩形");
+        return;
+      }
+      if (!cell.classList.contains("selected")) {
+        alert("選取範圍必須是完整矩形");
+        return;
+      }
+    }
   }
 
-  const first = cells[0];
-  first.colSpan = cells.length;
-  cells.slice(1).forEach(c => c.remove());
+  // 左上角儲存格保留
+  const master = table.rows[minRow].cells[minCol];
+  master.rowSpan = maxRow - minRow + 1;
+  master.colSpan = maxCol - minCol + 1;
+
+  // 移除其他儲存格
+  cells.forEach(cell => {
+    if (cell !== master) {
+      cell.remove();
+    }
+  });
 
   clearCellSelection();
 }
+
 
 
 // 垂直合併（最小可用版本）
@@ -2049,13 +2387,6 @@ document.getElementById("mediaMenu").onclick = e => {
 
   contentI.dispatchEvent(new Event("input"));
 };
-
-
-
-
-
-
-
 
 
 /* ========= Search ========= */
