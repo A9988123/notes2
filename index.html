@@ -11,181 +11,91 @@
 
 
 <style>
-
-
-/* 編輯區整體 */
+/* ===== 編輯區 ===== */
 #contentI {
   -webkit-user-select: text;
   user-select: text;
-  -webkit-touch-callout: none; /* 關掉長按浮層 */
+  -webkit-touch-callout: none; /* 關閉長按浮層 */
 }
 
-/* 表格內儲存格 */
-.note-table td.data-cell {
-  -webkit-user-select: text;
-  user-select: text;
-  touch-action: manipulation;
-}
-
-
-body {
-  margin: 0;
-  font-family: -apple-system, system-ui;
-  background: #f5f5f5;
-}
-
-/* ===== Header ===== */
-header {
-  padding: 14px 16px 6px;
-  font-size: 28px;
-  font-weight: 600;
-}
-
-/* ===== Search ===== */
-#searchBox {
-  width: calc(100% - 20px);
-  margin: 0 10px 10px;
-  padding: 10px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-}
-
-/* ===== Section Title ===== */
-.section-title {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: #777;
-}
-
-
-.row-resizer {
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  height: 6px;
-  width: 100%;
-  cursor: row-resize;
-}
-
-
-
-
-/* ===== Notes List ===== */
-.note-item {
+/* ===== 表格滾動容器 ===== */
+.table-scroll-wrapper {
+  overflow-x: auto;       /* 橫向滾動 */
+  overflow-y: hidden;     /* 不要垂直滾動，表格高度自適應 */
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch; /* 手機慣性滑動 */
   position: relative;
-  overflow: hidden;
-  background: #fff;
-  touch-action: pan-y pinch-zoom;
 }
 
-.note-item.pinned {
-  background: #fff8dc;
+/* ===== 表格 ===== */
+.note-table {
+  border-collapse: collapse;
+  min-width: 600px;  /* 欄位多才會橫向滑動 */
+  width: max-content; /* 避免表格被縮放 */
 }
 
-/* swipe 背景 bar */
-.swipe-bg {
-  position: absolute;
+/* 左上角空白 */
+.note-table .corner-cell {
+  position: sticky;
   top: 0;
-  bottom: 0;
-  width: 120px;
-  z-index: 1;
-}
-
-.swipe-bg.delete {
-  right: 0;
-  background: #ff3b30;
-}
-
-.swipe-bg.pin {
   left: 0;
-  background: #ffcc00;
-  color: #333;
+  background: #f9f9f9;
+  z-index: 3;
 }
 
-/* 主內容區塊 */
-.note-main {
-  position: relative;
-  width: 100%;
-  padding: 12px 14px;
-  background: #fff;
+/* 固定欄標題 */
+.note-table .col-header {
+  position: sticky;
+  top: 0;
+  background: #f1f1f1;
   z-index: 2;
-  transition: transform 0.25s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center; /* 讓縮圖垂直置中 */
+  text-align: center;
+  font-weight: bold;
 }
 
-/* 文字容器 */
-.note-main > div:first-child {
-  flex: 1;
-  min-width: 0; /* 文字截斷有效 */
+/* 固定列標題 */
+.note-table .row-header {
+  position: sticky;
+  left: 0;
+  background: #f1f1f1;
+  z-index: 1;
+  text-align: center;
+  font-weight: bold;
 }
 
-/* 標題與副標題文字截斷 */
-.note-title {
-  font-size: 16px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.note-sub {
-  font-size: 12px;
-  color: #888;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 刪除提示（浮在右側） */
-.note-item::after {
-  content: "🗑 刪除";
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 18px;
-  color: #d33;
-  display: none;
-}
-
-.note-item.show-delete::after {
-  display: block;
-}
-
-
-#tableMenu div{
-  padding:8px 14px;
-  cursor:pointer;
-}
-#tableMenu div:hover{
-  background:#f0f0f0;
-}
-
-
+/* ===== 表格儲存格 ===== */
 .note-table td {
   user-select: none;
+  padding: 4px;
+  vertical-align: middle;
+  line-height: normal;
 }
 
+/* 資料格 */
 .note-table td.data-cell {
   user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+  height: 32px;      /* 統一高度 */
+  min-width: 80px;   /* 最小寬度 */
+  white-space: nowrap; /* 禁止自動換行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.note-table .col-header,
-.note-table .row-header {
-  background: #f2f2f2;
-  color: #666;
-  font-weight: bold;
-  text-align: center;
+/* 選取效果 */
+td.selected, .cell-selected {
+  background-color: rgba(0, 128, 255, 0.3);
 }
 
-.note-table td.selected {
-  background: #cce5ff;
+/* hover 提示 */
+td.col-header:hover,
+td.row-header:hover {
+  cursor: pointer;
+  background-color: rgba(0, 128, 255, 0.1);
 }
 
-
+/* ===== 調整列/欄尺寸 ===== */
 .col-resizer {
   position: absolute;
   top: 0;
@@ -196,22 +106,23 @@ header {
   z-index: 10;
 }
 
-
-
-td.selected {
-  background-color: rgba(0, 128, 255, 0.3); /* 整欄/整列選中效果 */
+.row-resizer {
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
 }
 
-td.col-header:hover,
-td.row-header:hover {
-  cursor: pointer;
-  background-color: rgba(0, 128, 255, 0.1);
+/* ===== 其他樣式保持原樣 ===== */
+body {
+  margin: 0;
+  font-family: -apple-system, system-ui;
+  background: #f5f5f5;
 }
 
-
-
-
-/* ===== FAB 新增按鈕 ===== */
+/* FAB 新增按鈕 */
 #fab {
   position: fixed;
   right: 18px;
@@ -229,7 +140,7 @@ td.row-header:hover {
   cursor: pointer;
 }
 
-/* ===== Context Menu ===== */
+/* Context Menu */
 #contextMenu {
   position: fixed;
   background: #fff;
@@ -247,157 +158,8 @@ td.row-header:hover {
 #contextMenu div:hover {
   background: #f0f0f0;
 }
-
-/* ===== Editor ===== */
-#editor {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #f5f5f5;
-  flex-direction: column;
-}
-
-#editorHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  background: #4a90e2;
-  color: white;
-}
-
-#editorToolbar {
-  display: flex;
-  padding: 6px 10px;
-  background: #eee;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-#editorToolbar button {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  background: white;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-#editorToolbar button:hover {
-  background: #ddd;
-}
-
-#editorContent {
-  flex: 1;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-}
-
-#editorContent input,
-#editorContent textarea {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #ccc;
-  resize: none;
-}
-
-/* Editor Swipe Hint */
-#editorSwipeHint {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: none;
-  align-items: center;
-  justify-content: flex-start;
-  padding-left: 20px;
-  font-size: 22px;
-  font-weight: 600;
-  color: #4a90e2;
-  background: rgba(245, 245, 245, 0.85);
-  z-index: 9998;
-  pointer-events: none;
-}
-
-/* ===== iOS 備忘錄列表右側縮圖 ===== */
-.note-preview {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #eee;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 10px; /* 與文字間隔 */
-}
-
-/* 圖片縮圖 */
-.note-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  border-radius: 6px;
-}
-
-/* 影片縮圖 */
-.note-preview video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  border-radius: 6px;
-}
-
-/* 表格縮圖（簡化） */
-.note-preview.table {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  color: #666;
-  background: #f2f2f2;
-}
-
-
-.cell-selected {
-  background: #cce5ff;
-}
-
-
-.note-thumb {
-  width: 56px;
-  height: 56px;
-  flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 6px;
-  margin-left: 6px;
-}
-
-.table-scroll-wrapper {
-  overflow-x: auto;
-  overflow-y: hidden;
-  max-width: 100%;
-  -webkit-overflow-scrolling: touch;
-}
-
-.note-table {
-  min-width: 600px; /* 欄位多才會橫向滑 */
-}
-
-
-
 </style>
+
 </head>
 
 <body>
@@ -1330,23 +1092,17 @@ function changeFontSize(increase=true){
 function insertTable(rows = 5, cols = 5) {
   const wrapper = document.createElement("div");
   wrapper.className = "table-scroll-wrapper";
-  wrapper.style.overflow = "auto"; // ✅ 手機可左右滑動
 
   const table = document.createElement("table");
   table.className = "note-table";
-  table.setAttribute("contenteditable", "false"); // table 整體不可編輯
-  table.style.borderCollapse = "collapse";
-  table.style.margin = "8px 0";
+  table.setAttribute("contenteditable", "false");
 
   for (let r = 0; r <= rows; r++) {
     const tr = document.createElement("tr");
-
     for (let c = 0; c <= cols; c++) {
       const td = document.createElement("td");
-      td.style.border = "1px solid #ccc";
       td.style.minWidth = "80px";
       td.style.height = "32px";
-      td.style.padding = "4px";
 
       if (r === 0 && c === 0) {
         td.className = "corner-cell";
@@ -1354,34 +1110,27 @@ function insertTable(rows = 5, cols = 5) {
       } else if (r === 0) {
         td.className = "col-header";
         td.contentEditable = "false";
-        td.innerText = String.fromCharCode(64 + c);
+        td.textContent = String.fromCharCode(64 + c);
       } else if (c === 0) {
         td.className = "row-header";
         td.contentEditable = "false";
-        td.innerText = r;
+        td.textContent = r;
       } else {
         td.className = "data-cell";
         td.contentEditable = "true";
         td.innerHTML = "\u200B";
-
-        // ✅ 手機點擊直接聚焦
-        td.addEventListener("touchstart", () => {
-          placeCaretInsideCell(td);
-        });
       }
-
       tr.appendChild(td);
     }
-
     table.appendChild(tr);
   }
 
   wrapper.appendChild(table);
   insertNodeAtCursor(wrapper);
 
-  // 游標放在 A1
-  const firstDataCell = table.querySelector(".data-cell");
-  placeCaretInsideCell(firstDataCell);
+  // 游標放在第一個資料格
+  const firstCell = table.querySelector(".data-cell");
+  placeCaretInsideCell(firstCell);
 
   enableExcelSelection(table);
   addColumnResizers(table);
@@ -1408,62 +1157,37 @@ contentI.addEventListener("focus", () => {
 
 let isDragging = false;
 let dragStartCell = null;
-let longPressTimer = null;
 
-// touchstart
 contentI.addEventListener("touchstart", e => {
-  const td = e.target.closest("td");
+  const td = e.target.closest("td.data-cell");
   if (!td) return;
 
   clearCellSelection();
-
-  // 判斷點的是哪種格子
-  if (td.classList.contains("data-cell")) {
-    dragStartCell = td;
-    td.classList.add("selected");
-    isDragging = true;
-  } else if (td.classList.contains("row-header")) {
-    selectRow(td.parentElement);
-  } else if (td.classList.contains("col-header")) {
-    const index = td.cellIndex;
-    selectColumn(td.closest("table"), index);
-  }
-
-  // 長按選單
-  longPressTimer = setTimeout(() => {
-    e.preventDefault();
-    handleTableContextMenu(e, td);
-  }, 500);
+  td.classList.add("selected");
+  dragStartCell = td;
+  isDragging = true;
 });
 
-// touchmove
 contentI.addEventListener("touchmove", e => {
-  clearTimeout(longPressTimer);
-
   if (!isDragging) return;
-
   const touch = e.touches[0];
   const el = document.elementFromPoint(touch.clientX, touch.clientY);
   const td = el?.closest("td.data-cell");
 
   if (!td) {
-    isDragging = false;
-    dragStartCell = null;
+    isDragging = false; // 手指滑出表格，取消選取
     return;
   }
 
-  e.preventDefault();
+  e.preventDefault(); // 阻止頁面滾動
   clearCellSelection();
   selectRect(dragStartCell, td);
 });
 
-// touchend
 contentI.addEventListener("touchend", () => {
   isDragging = false;
   dragStartCell = null;
-  clearTimeout(longPressTimer);
 });
-
 
 
 // ===== 把「右鍵邏輯」抽成共用function=====
