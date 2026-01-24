@@ -1401,12 +1401,6 @@ function insertTable(rows = 5, cols = 5) {
 
 
 
-
-// ===== 啟用表格選取功能 =====
-let anchorCell = null;
-let isDragging = false;
-let dragStartCell = null;
-
 function resetTableSelectionState() {
   anchorCell = null;
   dragStartCell = null;
@@ -1414,36 +1408,40 @@ function resetTableSelectionState() {
   clearCellSelection();
 }
 
+let anchorCell = null;
 
 contentI.addEventListener("focus", () => {
   resetTableSelectionState();
 });
 
 
-
-// ========手機版本功能========== 關鍵改法:加入「長按 = 右鍵」======================
-// ===== 新增「長按偵測」 (只給手機用)=====
-// ===== 加在JS全域 (只要一次)=====
-// ===== 在content1加入touch支援=====
-// ===== touchstart:開始長按計時=====
-
+let isDragging = false;
+let dragStartCell = null;
 let longPressTimer = null;
-const LONG_PRESS_TIME = 500;
 
+// ===== touchstart: 點下去 =====
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
+  // 1️⃣ 記錄拖曳起點
+  clearCellSelection();
+  td.classList.add("selected");
+  dragStartCell = td;
+  isDragging = true;
+
+  // 2️⃣ 設置長按計時器
   longPressTimer = setTimeout(() => {
+    e.preventDefault(); // 長按成功才阻止事件
     handleTableContextMenu(e, td);
-  }, LONG_PRESS_TIME);
+  }, 500); // 長按 500ms
 });
 
+// ===== touchmove: 手指滑動 =====
 contentI.addEventListener("touchmove", e => {
-  // ───── 1. 取消長按計時器，避免誤觸右鍵
+  // 取消長按計時器，避免誤觸右鍵
   clearTimeout(longPressTimer);
 
-  // ───── 2. 拖曳選取表格
   if (!isDragging) return;
 
   const touch = e.touches[0];
@@ -1451,24 +1449,29 @@ contentI.addEventListener("touchmove", e => {
   const td = el?.closest("td.data-cell");
 
   if (!td) {
-    // 👉 手指滑出表格 → 結束選取
+    // 滑出表格 → 取消拖曳
     isDragging = false;
     dragStartCell = null;
-    clearCellSelection(); // 可選，看你要不要清掉選取
+    clearCellSelection();
     return;
   }
 
-  // 👉 只在表格內才阻止頁面滾動
+  // 只在表格內阻止頁面滾動
   e.preventDefault();
 
-  // ───── 清除舊選取，並重新選取矩形範圍
+  // 清除舊選取，並選取矩形範圍
   clearCellSelection();
   selectRect(dragStartCell, td);
 });
 
+// ===== touchend: 放開手指 =====
 contentI.addEventListener("touchend", () => {
+  // 放開就取消拖曳和長按
+  isDragging = false;
+  dragStartCell = null;
   clearTimeout(longPressTimer);
 });
+
 
 
 // ===== 把「右鍵邏輯」抽成共用function=====
