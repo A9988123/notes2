@@ -1328,12 +1328,11 @@ function changeFontSize(increase=true){
 //==== 2. 表格設置，並加入合併/分割功能====完全符合 Excel 式的表格結構
 
 function insertTable(rows = 5, cols = 5) {
-
-  // 🔹 1. 外層 wrapper（負責橫向滑動）
   const wrapper = document.createElement("div");
   wrapper.className = "table-scroll-wrapper";
+  wrapper.style.overflow = "auto";       // 滾動
+  wrapper.style.position = "relative";   // 固定用
 
-  // 🔹 2. 原本的 table（幾乎不動）
   const table = document.createElement("table");
   table.className = "note-table";
   table.setAttribute("contenteditable", "false");
@@ -1348,33 +1347,40 @@ function insertTable(rows = 5, cols = 5) {
       td.style.border = "1px solid #ccc";
       td.style.minWidth = "80px";
       td.style.height = "32px";
+      td.style.boxSizing = "border-box"; // 🔑 防止高度被撐開
 
-      // ───── 左上角（空白）─────
       if (r === 0 && c === 0) {
         td.className = "corner-cell";
         td.contentEditable = "false";
         td.innerHTML = "";
-      }
-
-      // ───── 欄標題 A B C ─────
+        td.style.position = "sticky";
+        td.style.top = "0";
+        td.style.left = "0";
+        td.style.background = "#f5f5f5";
+        td.style.zIndex = "3";
+      } 
       else if (r === 0) {
         td.className = "col-header";
         td.contentEditable = "false";
-        td.innerHTML = String.fromCharCode(64 + c);
-      }
-
-      // ───── 列標題 1 2 3 ─────
+        td.innerHTML = String.fromCharCode(64 + c); // A B C
+        td.style.position = "sticky";
+        td.style.top = "0";
+        td.style.background = "#f5f5f5";
+        td.style.zIndex = "2";
+      } 
       else if (c === 0) {
         td.className = "row-header";
         td.contentEditable = "false";
         td.innerHTML = r;
-      }
-
-      // ───── 真正資料格（A1 開始）─────
+        td.style.position = "sticky";
+        td.style.left = "0";
+        td.style.background = "#f5f5f5";
+        td.style.zIndex = "2";
+      } 
       else {
         td.className = "data-cell";
         td.contentEditable = "true";
-        td.innerHTML = "\u200B";
+        td.innerHTML = "\u200B"; // 零寬字
       }
 
       tr.appendChild(td);
@@ -1383,15 +1389,13 @@ function insertTable(rows = 5, cols = 5) {
     table.appendChild(tr);
   }
 
-  // 🔹 3. 包進 wrapper 再插入
   wrapper.appendChild(table);
   insertNodeAtCursor(wrapper);
 
-  // 🔹 4. 游標放在 A1（⚠️ 要對 table，不是 wrapper）
+  // 游標放在 A1
   const firstDataCell = table.querySelector(".data-cell");
   placeCaretInsideCell(firstDataCell);
 
-  // 🔹 5. 原本功能全部保留
   enableExcelSelection(table);
   addColumnResizers(table);
   addRowResizers(table);
