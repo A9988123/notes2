@@ -1423,29 +1423,34 @@ let isDragging = false;
 let dragStartCell = null;
 let longPressTimer = null;
 
-// ===== touchstart: 點下去 =====
-let dragStartCell = null;
-let isDragging = false;
-
+// touchstart
 contentI.addEventListener("touchstart", e => {
-  const td = e.target.closest("td.data-cell");
+  const td = e.target.closest("td");
   if (!td) return;
 
-  // 記錄起點
   clearCellSelection();
-  td.classList.add("selected");
-  dragStartCell = td;
-  isDragging = true;
 
-  // 如果要長按彈出選單，也可以加
+  // 判斷點的是哪種格子
+  if (td.classList.contains("data-cell")) {
+    dragStartCell = td;
+    td.classList.add("selected");
+    isDragging = true;
+  } else if (td.classList.contains("row-header")) {
+    selectRow(td.parentElement);
+  } else if (td.classList.contains("col-header")) {
+    const index = td.cellIndex;
+    selectColumn(td.closest("table"), index);
+  }
+
+  // 長按選單
   longPressTimer = setTimeout(() => {
     e.preventDefault();
     handleTableContextMenu(e, td);
   }, 500);
 });
 
+// touchmove
 contentI.addEventListener("touchmove", e => {
-  // 取消長按計時
   clearTimeout(longPressTimer);
 
   if (!isDragging) return;
@@ -1455,17 +1460,17 @@ contentI.addEventListener("touchmove", e => {
   const td = el?.closest("td.data-cell");
 
   if (!td) {
-    // 手指滑出表格 → 結束選取
     isDragging = false;
     dragStartCell = null;
     return;
   }
 
-  e.preventDefault(); // 只在表格內阻止滾動
+  e.preventDefault();
   clearCellSelection();
   selectRect(dragStartCell, td);
 });
 
+// touchend
 contentI.addEventListener("touchend", () => {
   isDragging = false;
   dragStartCell = null;
@@ -1609,13 +1614,21 @@ document.addEventListener("pointerup", () => {
 
 
 
+function selectRow(tr) {
+  tr.querySelectorAll(".data-cell").forEach(td => td.classList.add("selected"));
+}
 
+function selectColumn(table, index) {
+  table.querySelectorAll("tr").forEach(tr => {
+    const td = tr.cells[index];
+    if (td && td.classList.contains("data-cell")) {
+      td.classList.add("selected");
+    }
+  });
+}
 
-// ===== 清除所有選取 =====
 function clearCellSelection() {
-  document
-    .querySelectorAll(".note-table td.selected")
-    .forEach(td => td.classList.remove("selected"));
+  contentI.querySelectorAll(".data-cell.selected").forEach(td => td.classList.remove("selected"));
 }
 
 
