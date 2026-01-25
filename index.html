@@ -2117,6 +2117,26 @@ function stopResizeColumn() {
 
 
 
+
+document.addEventListener("pointerup", e => {
+  if (!isDragging) return;
+
+  // 🔹 拖曳結束
+  isDragging = false;
+
+  // 🔹 如果最後一格是 td.data-cell，設為 activeCell
+  const td = e.target.closest("td.data-cell");
+  if (td) {
+    activeCell = td;
+  }
+
+  // 🔹 清空 anchorCell / dragStartCell
+  dragStartCell = null;
+  anchorCell = null;
+});
+
+
+
 // =================================================================
 
 
