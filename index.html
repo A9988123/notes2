@@ -1173,26 +1173,28 @@ let activeCell = null;
 let activeTable = null;
 let activeMedia = null;
 
+// ================= 桌面右鍵 / 媒體右鍵 =================
 contentI.addEventListener("contextmenu", e => {
   const td = e.target.closest("td.data-cell");
   const media = e.target.closest("img, video");
 
-  // 如果正在拖曳，先結束拖曳
+  if (!td && !media) return;
+
+  // 拖曳結束後才觸發
   if (isDragging) {
     isDragging = false;
     dragStartCell = null;
     anchorCell = null;
   }
 
-  // ================= 表格右鍵 =================
-  if (td) {
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 
+  // ===== 表格右鍵 =====
+  if (td) {
     activeTable = td.closest("table");
     activeMedia = null;
 
-    // 👉 如果目前沒有任何選取，才選取右鍵那格
     const selected = getSelectedDataCells();
     if (selected.length === 0) {
       clearCellSelection();
@@ -1200,43 +1202,22 @@ contentI.addEventListener("contextmenu", e => {
       anchorCell = td;
     }
 
-    // 👉 activeCell 永遠指向 selection 的左上角（穩定）
     const cells = getSelectedDataCells();
-    if (cells.length > 0) {
-      activeCell = cells[0];
-    }
+    if (cells.length > 0) activeCell = cells[0];
 
-    // 顯示表格右鍵選單
-    const menu = document.getElementById("tableMenu");
-    menu.style.left = e.clientX + "px";
-    menu.style.top = e.clientY + "px";
-    menu.style.display = "block";
-
-    // 隱藏 media menu
-    document.getElementById("mediaMenu").style.display = "none";
+    showContextMenu(td, e.clientX, e.clientY);
     return;
   }
 
-  // ================= 圖片 / 影片右鍵 =================
+  // ===== 媒體右鍵 =====
   if (media) {
-    e.preventDefault();
-    e.stopPropagation();
-
     activeMedia = media;
     activeCell = null;
     activeTable = null;
 
-    const menu = document.getElementById("mediaMenu");
-    menu.style.left = e.clientX + "px";
-    menu.style.top = e.clientY + "px";
-    menu.style.display = "block";
-
-    document.getElementById("tableMenu").style.display = "none";
-    return;
+    showMediaMenu(media, e.clientX, e.clientY);
   }
 });
-
-
 
 // 點空白處關閉所有選單
 document.addEventListener("click", () => {
@@ -1648,20 +1629,64 @@ function selectRect(cellA, cellB) {
 
 
 
+// ================= 手機長按右鍵 + 桌面右鍵整合 =================
+
+const LONGPRESS_DURATION = 500; // 手機長按 500ms 觸發
+const TOUCH_DRAG_THRESHOLD = 5; // 手指拖動超過 5px 視為拖曳
+
 contentI.addEventListener("pointerdown", e => {
-  // ⭐ 手機不走 pointer 選取
-  if (e.pointerType === "touch") return;
-
   const td = e.target.closest("td.data-cell");
-  if (!td) return;
+  const media = e.target.closest("img, video");
 
-  clearCellSelection();
-  td.classList.add("selected");
+  if (!td && !media) return;
 
-  anchorCell = td;
-  dragStartCell = td;
-  isDragging = true;
+  // 記錄拖曳起點
+  if (td) {
+    dragStartCell = td;
+    anchorCell = td;
+    isDragging = false;
+  }
+
+  // ⭐ 手機長按觸發右鍵
+  if (e.pointerType === "touch") {
+    let startX = e.clientX;
+    let startY = e.clientY;
+
+    longPressTimer = setTimeout(() => {
+      // 手指沒有拖動過才顯示
+      if (!isDragging) {
+        activeCell = td;
+        activeTable = td.closest("table");
+        showContextMenu(td, startX, startY);
+      }
+    }, LONGPRESS_DURATION);
+
+    // 監控移動，超過閾值取消長按
+    const moveHandler = ev => {
+      if (Math.abs(ev.clientX - startX) > TOUCH_DRAG_THRESHOLD ||
+          Math.abs(ev.clientY - startY) > TOUCH_DRAG_THRESHOLD) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        contentI.removeEventListener("pointermove", moveHandler);
+      }
+    };
+
+    contentI.addEventListener("pointermove", moveHandler);
+  }
 });
+
+
+contentI.addEventListener("pointerup", e => {
+  // 結束拖曳
+  isDragging = false;
+  dragStartCell = null;
+  anchorCell = null;
+
+  // 取消長按計時
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+});
+
 
 
 
