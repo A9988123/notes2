@@ -1444,13 +1444,12 @@ function cancelLongPress() {
 
 
 // ================= 手機 touch 選取 & 長按 ==========================
-// ===== 📱 Mobile Excel 式拖曳矩形選取 + 長按功能選單 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
 let longPressTimer = null;
 
-// touchstart：開始選取，啟動長按
+// touchstart
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
@@ -1462,16 +1461,16 @@ contentI.addEventListener("touchstart", e => {
   anchorCell = td;
   activeCell = td;
 
-  // 保留目前選取，不清除所有選取
+  // 先清除選取，只清除當前單格
   td.classList.add("selected");
 
-  // ⭐ 長按 0.5 秒彈出表格選單
+  // ⭐ 長按 0.5 秒彈出功能選單
   longPressTimer = setTimeout(() => {
     handleTableContextMenu(e, td);
   }, 500);
 });
 
-// touchmove：拖曳矩形選取
+// touchmove
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
@@ -1481,25 +1480,24 @@ contentI.addEventListener("touchmove", e => {
 
   mobileHasMoved = true;
 
-  // 拖動時取消長按
+  // 拖動 -> 取消長按
   if (longPressTimer) {
     clearTimeout(longPressTimer);
     longPressTimer = null;
   }
 
-  // 拖曳矩形選取
-  clearCellSelection(); // ⭐ 每次更新矩形範圍前清掉舊選取
+  // ⭐ 拖曳矩形選取
+  clearCellSelection(); // 先清掉舊選取
   selectRect(mobileStartCell, td);
 
-  e.preventDefault(); // ⭐ 阻止手機滾動
+  e.preventDefault(); // 防止頁面滾動
 }, { passive: false });
 
-// touchend / touchcancel：結束選取
+// touchend / touchcancel
 function endMobileSelection() {
   mobileSelecting = false;
   mobileStartCell = null;
 
-  // 長按還沒觸發就清掉
   if (longPressTimer) {
     clearTimeout(longPressTimer);
     longPressTimer = null;
@@ -1508,8 +1506,6 @@ function endMobileSelection() {
 
 contentI.addEventListener("touchend", endMobileSelection);
 contentI.addEventListener("touchcancel", endMobileSelection);
-
-
 
 // ================= 手機 touch 選取 & 長按 =========================
 
