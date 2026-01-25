@@ -1470,7 +1470,6 @@ function cancelLongPress() {
 
 // =========================== 手機拖曳選取邏輯 =================================================================================
 
-contentI.querySelectorAll("td.data-cell").forEach(td => bindMobileTouchEvents(td));
 
 let mobileSelecting = false;
 let mobileStartCell = null;
@@ -1544,14 +1543,10 @@ function findCellPosition(td) {
 function showContextMenu(cell) {
   if (!cell) return;
   const rect = cell.getBoundingClientRect();
-  // 模擬觸控事件完整物件
-  const fakeEvent = {
-    target: cell,
-    touches: [{ clientX: rect.left + rect.width/2, clientY: rect.top + rect.height/2 }]
-  };
-  handleTableContextMenu(fakeEvent, cell);
+  handleTableContextMenu({
+    touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }]
+  }, cell);
 }
-
 
 // ===== touchstart =====
 contentI.addEventListener("touchstart", e => {
@@ -1620,10 +1615,7 @@ contentI.addEventListener("touchcancel", () => {
   mobileHasMoved = false;
 });
 
-// 保存原格子內容和位置的 Map
-let mergedCellMap = new WeakMap();
-
-// 合併格子
+// ===== 合併格子 =====
 function mergeSelectedCells() {
   buildCellMatrix();
   const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
@@ -1639,34 +1631,25 @@ function mergeSelectedCells() {
     maxCol = Math.max(maxCol, pos.col);
   });
 
-  const topLeftCell = cellMatrix[minRow][minCol];
   const rowSpan = maxRow - minRow + 1;
   const colSpan = maxCol - minCol + 1;
 
-  // 保存原格子資料
-  const cellsData = [];
-  for (let r = minRow; r <= maxRow; r++) {
-    for (let c = minCol; c <= maxCol; c++) {
-      const td = cellMatrix[r][c];
-      if (td && td !== topLeftCell) {
-        cellsData.push({ row: r, col: c, content: td.innerHTML, parent: td.parentElement });
-      }
-    }
-  }
-  mergedCellMap.set(topLeftCell, cellsData);
-
+  const topLeftCell = cellMatrix[minRow][minCol];
   topLeftCell.rowSpan = rowSpan;
   topLeftCell.colSpan = colSpan;
 
-  // 移除其他格子
-  cellsData.forEach(d => d.parent.removeChild(cellMatrix[d.row][d.col]));
-
+  for (let r = minRow; r <= maxRow; r++) {
+    for (let c = minCol; c <= maxCol; c++) {
+      const td = cellMatrix[r][c];
+      if (td !== topLeftCell) td.remove();
+    }
+  }
   clearCellSelection();
   topLeftCell.classList.add("selected");
   buildCellMatrix();
 }
 
-// 拆分格子
+// ===== 拆分格子 =====
 function splitCell(td) {
   buildCellMatrix();
   const pos = findCellPosition(td);
@@ -1677,28 +1660,18 @@ function splitCell(td) {
   td.rowSpan = 1;
   td.colSpan = 1;
 
+  const tr = td.parentElement;
   for (let r = 0; r < rowSpan; r++) {
-    let targetRow = td.parentElement.parentElement.rows[pos.row + r];
     for (let c = 0; c < colSpan; c++) {
       if (r === 0 && c === 0) continue; // 保留原 td
-      const newTd = document.createElement("td");
+      let targetRow = tr.parentElement.rows[pos.row + r];
+      let newTd = document.createElement("td");
       newTd.className = "data-cell";
-      newTd.textContent = ""; // 可保留原資料
-      bindMobileTouchEvents(newTd); // 綁定觸控事件
+      newTd.textContent = ""; // 可保留原本資料
       targetRow.insertBefore(newTd, targetRow.cells[pos.col + c] || null);
     }
   }
   buildCellMatrix();
-}
-
-
-
-// 手機拖曳/長按右鍵綁定函數
-function bindMobileTouchEvents(td) {
-  td.addEventListener("touchstart", handleTouchStart, { passive: false });
-  td.addEventListener("touchmove", handleTouchMove, { passive: false });
-  td.addEventListener("touchend", handleTouchEnd, { passive: false });
-  td.addEventListener("touchcancel", handleTouchCancel);
 }
 
 
