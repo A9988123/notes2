@@ -1468,7 +1468,8 @@ function cancelLongPress() {
 
 
 
-// ===== 手機拖曳選取邏輯 =====
+// ============== 手機拖曳選取邏輯 ==============================================================================================
+
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1492,7 +1493,10 @@ contentI.addEventListener("touchstart", e => {
   longPressTimer = setTimeout(() => {
     if (!mobileHasMoved && mobileStartCell) {
       handleTableContextMenu({
-        touches: [{ clientX: td.getBoundingClientRect().left + td.offsetWidth/2, clientY: td.getBoundingClientRect().top + td.offsetHeight/2 }]
+        touches: [{ 
+          clientX: mobileStartCell.getBoundingClientRect().left + mobileStartCell.offsetWidth/2, 
+          clientY: mobileStartCell.getBoundingClientRect().top + mobileStartCell.offsetHeight/2 
+        }]
       }, mobileStartCell);
     }
   }, 500);
@@ -1522,8 +1526,8 @@ contentI.addEventListener("touchend", e => {
   if (!mobileStartCell) return;
 
   const selectedCells = getSelectedDataCells();
-  if (mobileHasMoved && selectedCells.length) {
-    // 拖曳後，選取右下角格子作為右鍵參考
+  if (selectedCells.length) {
+    // 拖曳或單格選取後，取右下角格子作為右鍵位置
     const lastCell = selectedCells.reduce((acc, cell) => {
       const r = cell.parentElement.rowIndex;
       const c = cell.cellIndex;
@@ -1533,9 +1537,11 @@ contentI.addEventListener("touchend", e => {
       return acc;
     }, null).cell;
 
-    // 使用最後一個格子中心作為菜單位置
     handleTableContextMenu({
-      touches: [{ clientX: lastCell.getBoundingClientRect().left + lastCell.offsetWidth/2, clientY: lastCell.getBoundingClientRect().top + lastCell.offsetHeight/2 }]
+      touches: [{ 
+        clientX: lastCell.getBoundingClientRect().left + lastCell.offsetWidth/2, 
+        clientY: lastCell.getBoundingClientRect().top + lastCell.offsetHeight/2 
+      }]
     }, lastCell);
   }
 
@@ -1554,6 +1560,7 @@ contentI.addEventListener("touchcancel", () => {
 
 
 
+//==============================================================================================================================
 
 // ===== 手機 touchcancel（中斷時清理狀態） =====
 contentI.addEventListener("touchcancel", () => {
