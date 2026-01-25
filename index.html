@@ -28,6 +28,14 @@
 }
 
 
+/* 禁止 body / html 的滾動*/
+html, body {
+  overflow: hidden;          /* 阻止整個頁面滾動 */
+  height: 100%;              /* 確保 body 滿版 */
+  touch-action: none;        /* 阻止手勢滑動 */
+}
+
+
 body {
   margin: 0;
   font-family: -apple-system, system-ui;
@@ -296,6 +304,15 @@ td.row-header:hover {
   display: flex;
   flex-direction: column;
 }
+
+/* #noteList 或 #editorContent 仍需要垂直滑動： */
+#noteList, #editorContent {
+  overflow-y: auto;          /* 允許垂直滾動 */
+  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
+  touch-action: pan-y;       /* 只允許縱向滑動 */
+}
+
+
 
 #editorContent input,
 #editorContent textarea {
