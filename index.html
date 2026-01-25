@@ -1470,6 +1470,7 @@ function cancelLongPress() {
 
 // =========================== 手機拖曳選取邏輯 =================================================================================
 
+contentI.querySelectorAll("td.data-cell").forEach(td => bindMobileTouchEvents(td));
 
 let mobileSelecting = false;
 let mobileStartCell = null;
@@ -1543,10 +1544,14 @@ function findCellPosition(td) {
 function showContextMenu(cell) {
   if (!cell) return;
   const rect = cell.getBoundingClientRect();
-  handleTableContextMenu({
-    touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }]
-  }, cell);
+  // 模擬觸控事件完整物件
+  const fakeEvent = {
+    target: cell,
+    touches: [{ clientX: rect.left + rect.width/2, clientY: rect.top + rect.height/2 }]
+  };
+  handleTableContextMenu(fakeEvent, cell);
 }
+
 
 // ===== touchstart =====
 contentI.addEventListener("touchstart", e => {
@@ -1664,27 +1669,28 @@ function mergeSelectedCells() {
 // 拆分格子
 function splitCell(td) {
   buildCellMatrix();
+  const pos = findCellPosition(td);
+  if (!pos) return;
 
-  const cellsData = mergedCellMap.get(td);
-  if (!cellsData) return;
-
+  const rowSpan = td.rowSpan || 1;
+  const colSpan = td.colSpan || 1;
   td.rowSpan = 1;
   td.colSpan = 1;
 
-  cellsData.forEach(data => {
-    const newTd = document.createElement("td");
-    newTd.className = "data-cell";
-    newTd.innerHTML = data.content || "";
-    data.parent.insertBefore(newTd, data.parent.cells[data.col] || null);
-
-    // 重新綁定手機拖曳右鍵事件
-    bindMobileTouchEvents(newTd);
-  });
-
-  mergedCellMap.delete(td);
+  for (let r = 0; r < rowSpan; r++) {
+    let targetRow = td.parentElement.parentElement.rows[pos.row + r];
+    for (let c = 0; c < colSpan; c++) {
+      if (r === 0 && c === 0) continue; // 保留原 td
+      const newTd = document.createElement("td");
+      newTd.className = "data-cell";
+      newTd.textContent = ""; // 可保留原資料
+      bindMobileTouchEvents(newTd); // 綁定觸控事件
+      targetRow.insertBefore(newTd, targetRow.cells[pos.col + c] || null);
+    }
+  }
   buildCellMatrix();
-  clearCellSelection();
 }
+
 
 
 // 手機拖曳/長按右鍵綁定函數
