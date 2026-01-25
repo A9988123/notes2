@@ -1410,36 +1410,57 @@ const LONG_PRESS_TIME = 500; // ms
 // ===== 在content1加入touch支援=====
 // ===== touchstart:開始長按計時=====
 
+// ===== 📱 Mobile drag select =====
+let mobileSelecting = false;
+let mobileStartCell = null;
+
+
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  // ⭐ 手機單點 = 單選
+  // ❗ 不干擾長按右鍵
+  if (longPressTimer) return;
+
+  mobileSelecting = true;
+  mobileStartCell = td;
+
   clearCellSelection();
   td.classList.add("selected");
+
   anchorCell = td;
   activeCell = td;
 });
 
 
 
-
-
-contentI.addEventListener("touchend", () => {
-  clearTimeout(longPressTimer);
-});
-
-contentI.addEventListener("touchmove", () => {
-  clearTimeout(longPressTimer);
-});
-
-
-
 // ===== touchmove:手指移動->取消長按(避免誤觸)=====
+//  手機 touchmove（矩形選取）   這是 Excel Lite 的靈魂   
 
-contentI.addEventListener("touchmove", () => {
-  clearTimeout(longPressTimer);
+contentI.addEventListener("touchmove", e => {
+  if (!mobileSelecting) return;
+
+  const touch = e.touches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const td = el?.closest("td.data-cell");
+  if (!td || td === mobileStartCell) return;
+
+  clearCellSelection();
+  selectRect(mobileStartCell, td);
+
+  e.preventDefault(); // ⭐ 防止畫面滑動
 });
+
+
+function endMobileSelection() {
+  mobileSelecting = false;
+  mobileStartCell = null;
+}
+
+contentI.addEventListener("touchend", endMobileSelection);
+contentI.addEventListener("touchcancel", endMobileSelection);
+
+
 
 // ===== touchend:放開->取消長按=====
 
@@ -1545,7 +1566,7 @@ function selectRect(cellA, cellB) {
 
 
 contentI.addEventListener("pointerdown", e => {
-  // ⭐ 手機直接跳過，避免和 touchstart 重複
+  // ⭐ 手機不走 pointer 選取
   if (e.pointerType === "touch") return;
 
   const td = e.target.closest("td.data-cell");
@@ -1558,6 +1579,7 @@ contentI.addEventListener("pointerdown", e => {
   dragStartCell = td;
   isDragging = true;
 });
+
 
 
 
