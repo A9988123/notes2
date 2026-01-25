@@ -1,786 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>備忘錄</title>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#4A90E2">
-<meta name="format-detection" content="telephone=no,email=no,address=no,url=no">
-
-
-<style>
-
-
-/* 編輯區整體 */
-#contentI {
-  -webkit-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: none; /* 關掉長按浮層 */
-}
-
-/* 表格內儲存格 */
-.note-table td.data-cell {
-  -webkit-user-select: text;
-  user-select: text;
-  touch-action: manipulation;
-}
-
-
-/* 禁止 body / html 的滾動*/
-html, body {
-  overflow: hidden;          /* 阻止整個頁面滾動 */
-  height: 100%;              /* 確保 body 滿版 */
-  touch-action: none;        /* 阻止手勢滑動 */
-}
-
-
-body {
-  margin: 0;
-  font-family: -apple-system, system-ui;
-  background: #f5f5f5;
-}
-
-/* ===== Header ===== */
-header {
-  padding: 14px 16px 6px;
-  font-size: 28px;
-  font-weight: 600;
-}
-
-/* ===== Search ===== */
-#searchBox {
-  width: calc(100% - 20px);
-  margin: 0 10px 10px;
-  padding: 10px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-}
-
-/* ===== Section Title ===== */
-.section-title {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: #777;
-}
-
-
-.row-resizer {
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  height: 6px;
-  width: 100%;
-  cursor: row-resize;
-}
-
-
-
-
-/* ===== Notes List ===== */
-.note-item {
-  position: relative;
-  overflow: hidden;
-  background: #fff;
-  touch-action: pan-y pinch-zoom;
-}
-
-.note-item.pinned {
-  background: #fff8dc;
-}
-
-/* swipe 背景 bar */
-.swipe-bg {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 120px;
-  z-index: 1;
-}
-
-.swipe-bg.delete {
-  right: 0;
-  background: #ff3b30;
-}
-
-.swipe-bg.pin {
-  left: 0;
-  background: #ffcc00;
-  color: #333;
-}
-
-/* 主內容區塊 */
-.note-main {
-  position: relative;
-  width: 100%;
-  padding: 12px 14px;
-  background: #fff;
-  z-index: 2;
-  transition: transform 0.25s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center; /* 讓縮圖垂直置中 */
-}
-
-/* 文字容器 */
-.note-main > div:first-child {
-  flex: 1;
-  min-width: 0; /* 文字截斷有效 */
-}
-
-/* 標題與副標題文字截斷 */
-.note-title {
-  font-size: 16px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.note-sub {
-  font-size: 12px;
-  color: #888;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 刪除提示（浮在右側） */
-.note-item::after {
-  content: "🗑 刪除";
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 18px;
-  color: #d33;
-  display: none;
-}
-
-.note-item.show-delete::after {
-  display: block;
-}
-
-
-#tableMenu div{
-  padding:8px 14px;
-  cursor:pointer;
-}
-#tableMenu div:hover{
-  background:#f0f0f0;
-}
-
-
-.note-table td {
-  user-select: none;
-}
-
-.note-table td.data-cell {
-  user-select: text;
-}
-
-.note-table .col-header,
-.note-table .row-header {
-  background: #f2f2f2;
-  color: #666;
-  font-weight: bold;
-  text-align: center;
-}
-
-.note-table td.selected {
-  background: #cce5ff;
-}
-
-
-.col-resizer {
-  position: absolute;
-  top: 0;
-  right: -3px;
-  width: 6px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 10;
-}
-
-
-
-td.selected {
-  background-color: rgba(0, 128, 255, 0.3); /* 整欄/整列選中效果 */
-}
-
-td.col-header:hover,
-td.row-header:hover {
-  cursor: pointer;
-  background-color: rgba(0, 128, 255, 0.1);
-}
-
-
-
-
-/* ===== FAB 新增按鈕 ===== */
-#fab {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  font-size: 32px;
-  background: #4a90e2;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  cursor: pointer;
-}
-
-/* ===== Context Menu ===== */
-#contextMenu {
-  position: fixed;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  display: none;
-  z-index: 9999;
-}
-
-#contextMenu div {
-  padding: 10px 14px;
-  cursor: pointer;
-}
-
-#contextMenu div:hover {
-  background: #f0f0f0;
-}
-
-/* ===== Editor ===== */
-#editor {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #f5f5f5;
-  flex-direction: column;
-}
-
-#editorHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  background: #4a90e2;
-  color: white;
-}
-
-#editorToolbar {
-  display: flex;
-  padding: 6px 10px;
-  background: #eee;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-#editorToolbar button {
-  padding: 6px 10px;
-  border: none;
-  border-radius: 6px;
-  background: white;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-#editorToolbar button:hover {
-  background: #ddd;
-}
-
-#editorContent {
-  flex: 1;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* #noteList 或 #editorContent 仍需要垂直滑動： */
-#noteList, #editorContent {
-  overflow-y: auto;          /* 允許垂直滾動 */
-  -webkit-overflow-scrolling: touch; /* iOS 平滑滾動 */
-  touch-action: pan-y;       /* 只允許縱向滑動 */
-}
-
-
-
-#editorContent input,
-#editorContent textarea {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 8px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #ccc;
-  resize: none;
-}
-
-/* Editor Swipe Hint */
-#editorSwipeHint {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: none;
-  align-items: center;
-  justify-content: flex-start;
-  padding-left: 20px;
-  font-size: 22px;
-  font-weight: 600;
-  color: #4a90e2;
-  background: rgba(245, 245, 245, 0.85);
-  z-index: 9998;
-  pointer-events: none;
-}
-
-/* ===== iOS 備忘錄列表右側縮圖 ===== */
-.note-preview {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #eee;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 10px; /* 與文字間隔 */
-}
-
-/* 圖片縮圖 */
-.note-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  border-radius: 6px;
-}
-
-/* 影片縮圖 */
-.note-preview video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  border-radius: 6px;
-}
-
-/* 表格縮圖（簡化） */
-.note-preview.table {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  color: #666;
-  background: #f2f2f2;
-}
-
-
-.cell-selected {
-  background: #cce5ff;
-}
-
-
-.note-thumb {
-  width: 56px;
-  height: 56px;
-  flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 6px;
-  margin-left: 6px;
-}
-
-#noteList {
-  touch-action: pan-x;          /* ⭐ 阻止手勢滑動 */
-  overscroll-behavior: contain;
-}
-
-
-
-</style>
-</head>
-
-<body>
-
-<header style="display:flex;justify-content:space-between;align-items:center;">
-  <span>備忘錄</span>
-  <button onclick="toggleTopMenu(event)">⋯</button>
-</header>
-
-<input id="searchBox" placeholder="🔍 搜尋">
-<div id="searchResultInfo" class="section-title" style="display:none;"></div>
-
-
-<div id="noteList"></div>
-<button id="fab" onclick="newNote()">＋</button>
-<div id="contextMenu"></div>
-
-<!-- ===== Editor ===== -->
-<div id="editor">
-  <div id="editorHeader">
-    <button onclick="closeEditor()">返回列表</button>
-    <button onclick="saveEditor()">存檔</button>
-  </div>
-  <div id="editorToolbar">
-  <button onclick="changeFontSize(true)">🔼</button> <!-- 字體放大 -->
-  <button onclick="changeFontSize(false)">🔽</button> <!-- 字體縮小 -->
-    <button onclick="formatText('bold')">B</button>
-    <button onclick="formatText('italic')">I</button>
-    <button onclick="formatText('underline')">U</button>
-    <button onclick="insertTable()">表格</button>
-    <button onclick="insertImage()">圖片</button>
-    <button onclick="insertVideo()">影片</button>
-  </div>
-<div id="editorContent">
-  <div id="content" contenteditable="true" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:10px; overflow:auto;" placeholder="開始輸入…"></div>
-</div>
-
-</div>
-
-</div>
-
-<!-- ✅ 就放在這裡 -->
-<div id="editorSwipeHint">⬅ 返回列表</div>
-
-
-<div id="topMenu" style="
-  position:fixed;
-  top:60px;
-  right:10px;
-  background:#fff;
-  border-radius:10px;
-  box-shadow:0 4px 12px rgba(0,0,0,.25);
-  display:none;
-  z-index:9999;">
-</div>
-
-<input type="file" id="backupFile" style="display:none" accept=".json">
-
-<input type="file" id="imgPicker" accept="image/*" hidden>
-
-
-<div id="tableMenu" style="
-  position:fixed;
-  display:none;
-  background:#fff;
-  border:1px solid #ccc;
-  border-radius:6px;
-  box-shadow:0 4px 10px rgba(0,0,0,.15);
-  z-index:9999;
-">
-  <div data-act="merge">合併儲存格</div>
-<div data-act="merge-vertical">垂直合併</div>
-  <div data-act="split">分割儲存格</div>
-  <div data-act="delete">刪除表格</div>
-<div data-act="add-col-left">⬅ 插入欄</div>
-<div data-act="add-col-right">➡ 插入欄</div>
-<div data-act="add-row-up">⬆ 插入列</div>
-<div data-act="add-row-down">⬇ 插入列</div>
-
-</div>
-
-
-
-<div id="mediaMenu" style="
-  position:fixed;
-  display:none;
-  background:#fff;
-  border:1px solid #ccc;
-  border-radius:6px;
-  box-shadow:0 4px 10px rgba(0,0,0,.15);
-  z-index:9999;
-">
-  <div data-act="zoomIn">放大</div>
-  <div data-act="zoomOut">縮小</div>
-  <div data-act="delete">刪除</div>
-</div>
-
-
-
-
+有關手機介面插入表格後， 👉 無法手指拖曳：Excel 式連續選取 👉 無法停住 0.5 秒不動：表格功能選單跳出，可以幫我修正
 
 
 <script>
 
-/* ========= IndexedDB ========= */
-const DB_NAME="notesDB",STORE="notes";
-let db,currentId=null;
-
-function openDB(){return new Promise(r=>{const q=indexedDB.open(DB_NAME,1);q.onupgradeneeded=e=>{e.target.result.createObjectStore(STORE,{keyPath:"id"});};q.onsuccess=e=>{db=e.target.result;r();};});}
-function tx(m){return db.transaction(STORE,m).objectStore(STORE);}
-function save(n){tx("readwrite").put(n);}
-function all(){return new Promise(r=>{const q=tx("readonly").getAll();q.onsuccess=()=>r(q.result);});}
-
-/* ========= Crypto ========= */
-async function keyFromPassword(pw,salt){
- const enc=new TextEncoder();
- const base=await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveKey"]);
- return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
-}
-function rand(n){return crypto.getRandomValues(new Uint8Array(n));}
-async function encryptText(t,pw){
- const iv=rand(12),salt=rand(16);
- const key=await keyFromPassword(pw,salt);
- const buf=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(t));
- return{iv:[...iv],salt:[...salt],data:[...new Uint8Array(buf)]};
-}
-async function decryptText(o,pw){
- const key=await keyFromPassword(pw,new Uint8Array(o.salt));
- const buf=await crypto.subtle.decrypt({name:"AES-GCM",iv:new Uint8Array(o.iv)},key,new Uint8Array(o.data));
- return new TextDecoder().decode(buf);
-}
-
-/* ========= 
-✅ iOS 兩行顯示
-
-✅ 左滑刪除
-
-✅ 右滑釘選
-
-✅ 右鍵選單（桌機好用）
-
-❌ 不放拖曳（可再加）
-
-========= */
-
-/* ========= Render ========= */
-const list=document.getElementById("noteList");
-
-
-// 全域搜尋框
-const searchInput = document.getElementById("searchBox");
-
-// 高亮函式
-function highlight(text, keyword){
-  if(!keyword) return text;
-  const re = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")})`, "gi");
-  return text.replace(re, '<mark>$1</mark>');
-}
-
-
-// 刷新列表時，將關鍵字帶入（含搜尋鎖定）
-async function refresh() {
-  const q = searchInput.value.trim().toLowerCase();
-  const info = document.getElementById("searchResultInfo");
-
-  if (isSearching && !q) return;
-
-  const ns = (await all()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-  const filtered = ns.filter(n => {
-    if (!q) return true;
-    if (typeof n.content !== "string") return false;
-    return n.content.toLowerCase().includes(q);
-  });
-
-  if (q) {
-    info.style.display = "block";
-    info.textContent = filtered.length
-      ? `找到 ${filtered.length} 筆結果`
-      : "沒有符合的備忘錄";
-  } else {
-    info.style.display = "none";
-  }
-
-  list.innerHTML = "";
-
-  const pinned = filtered.filter(n => n.pinned);
-  const normal = filtered.filter(n => !n.pinned);
-
-  function renderWithContext(note) {
-    renderNote(note, q); // renderNote 本身就 append 到 list
-    const noteItems = list.querySelectorAll(".note-item"); 
-    const lastItem = noteItems[noteItems.length - 1]; // 取得剛 render 出來的那個
-    addContextMenuToNoteItem(lastItem, note); // 綁定右鍵
-  }
-
-  if (pinned.length) {
-    list.innerHTML += `<div class="section-title">已釘選</div>`;
-    pinned.forEach(renderWithContext);
-  }
-
-  normal.forEach(renderWithContext);
-}
-
-
-/* =============================renderNote 改成接收關鍵字=========================================== */
-
-function renderNote(n, keyword="") {
-  if (!n.timestamp) n.timestamp = Date.now();
-
-  const { lines, firstMedia } = extractTextLinesFromHTMLWithMedia(n.content || "");
-
-  let line1 = lines[0] || "無內容";
-  if (line1.length > 30) line1 = line1.slice(0, 30) + "...";
-
-  let line2Text = lines[1] || "";
-  if (keyword) {
-    const hitLine = lines.find(
-      (l, i) => i !== 0 && l.toLowerCase().includes(keyword)
-    );
-    if (hitLine) line2Text = hitLine;
-  }
-
-  if (line2Text.length > 40) line2Text = line2Text.slice(0, 40) + "...";
-
-  const timeText = formatListTime(n.timestamp);
-  let line2 = `${timeText} ${line2Text}`;
-
-  if (keyword) {
-    line1 = highlight(line1, keyword);
-    line2 = highlight(line2, keyword);
-  }
-
-  const d = document.createElement("div");
-  d.className = "note-item" + (n.pinned ? " pinned" : "");
-
-  d.innerHTML = `
-    <div class="swipe-bg delete"></div>
-    <div class="swipe-bg pin"></div>
-    <div class="note-main" style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="flex:1; min-width:0;">
-        <div class="note-title">${line1}</div>
-        <div class="note-sub">${line2}</div>
-      </div>
-      <div class="note-thumb" style="margin-left:-12px; position:relative; width: 60px; height: 60px; overflow: hidden; border-radius: 4px; background-color: #f0f0f0;">
-        <!-- 縮圖放置區 -->
-      </div>
-    </div>
-  `;
-
-// 放置縮圖（圖片 / 影片 / 表格）
-const thumb = d.querySelector(".note-thumb");
-
-if (firstMedia) {
-  if (firstMedia.tagName === "IMG") {
-    const img = document.createElement("img");
-    img.src = firstMedia.src;
-    img.style.width = "100%";
-    img.style.height = "100%";
-    img.style.objectFit = "cover";   // ✅ 填滿，不留白
-    img.style.borderRadius = "6px";
-    thumb.appendChild(img);
-
-  } else if (firstMedia.tagName === "VIDEO") {
-    const vid = document.createElement("video");
-    vid.src = firstMedia.src;
-    vid.muted = true;
-    vid.playsInline = true;
-    vid.style.width = "100%";
-    vid.style.height = "100%";
-    vid.style.objectFit = "cover";   // ✅ 不保持比例
-    thumb.appendChild(vid);
-
-  } else if (firstMedia.tagName === "TABLE") {
-    const table = document.createElement("table");
-    table.style.width = "100%";
-    table.style.height = "100%";
-    table.style.borderCollapse = "collapse";
-    table.style.fontSize = "7px";
-    table.style.tableLayout = "fixed";
-    table.style.transform = "scale(0.9)"; // ✅ 避免被裁
-    table.style.transformOrigin = "top left";
-
-    const rows = firstMedia.rows;
-    for (let r = 0; r < Math.min(2, rows.length); r++) {
-      const tr = document.createElement("tr");
-      for (let c = 0; c < Math.min(2, rows[r].cells.length); c++) {
-        const td = document.createElement("td");
-        td.style.border = "1px solid #ccc";
-        td.style.padding = "0";
-        tr.appendChild(td);
-      }
-      table.appendChild(tr);
-    }
-    thumb.appendChild(table);
-  }
-}
-
-
-  d.onclick = () => openEditor(n);
-  addSwipeListeners(d, n);
-  list.appendChild(d);
-}
-
-
-
-
-
-
-
-
-/* ========= Editor ================================================================================= */
-const editor=document.getElementById("editor");
-const contentI=document.getElementById("content");
-
-
-/* ========= 打開編輯器 ========= */
-function openEditor(n){
-  currentId = n.id;
-
-  if(n.encrypted){
-    contentI.innerHTML = "🔒 已加密，請解密";
-    contentI.contentEditable = false;
-  } else {
-    contentI.innerHTML = n.content || "";
-    contentI.contentEditable = true;
-
-    // ✅ 新增：綁定自動儲存（只在未加密時）
-    bindAutoSave(contentI, n);
-  }
-
-  document.getElementById("noteList").style.display = "none";
-  document.getElementById("fab").style.display = "none";
-  document.getElementById("searchBox").style.display = "none";
-  editor.style.display = "flex";
-}
-
-/* ========= 存檔 ========= */
-function saveEditor(){
-  if(!currentId) return;
-
-  all().then(ns=>{
-    const n = ns.find(x=>x.id===currentId);
-    if(!n || n.encrypted) return;
-
-    const html = contentI.innerHTML; // HTML
-    const text = contentI.innerText.trim(); // 用文字第一行作標題
-    const lines = text.split("\n");
-
-n.content = html;
-n.title = lines[0] || "";
-n.timestamp = Date.now(); // 🔥 關鍵
-save(n);
-
-    refresh();
-  });
-}
-
-/* ========= 新增筆記 ========= */
-function newNote(){
-  const n = {
-  id: Date.now().toString(),
-  title: "",
-  content: "",
-  encrypted: false,
-  pinned: false,
-  timestamp: Date.now() // 🔥
-};
-  save(n);
-  contentI.innerHTML = ""; // 清空編輯器
-  openEditor(n);
-}
 
 
 /* ========= Context / Top Menu 共用內容 ========= */
@@ -893,448 +115,6 @@ async function deleteAllNotes() {
 }
 
 
-/* ========= 設置密碼 (首次設置)  ========= */
-
-
-// 密碼加密
-async function encryptPassword(password) {
-    const salt = new Uint8Array(16);  // 你可以選擇隨機生成salt
-    crypto.getRandomValues(salt);  // 隨機生成 salt
-
-    const enc = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey(
-        "raw",
-        enc.encode(password), 
-        "PBKDF2", 
-        false, 
-        ["deriveKey"]
-    );
-
-    // 使用 PBKDF2 派生出 AES 密鑰
-    const key = await crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-        baseKey,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["encrypt", "decrypt"]
-    );
-
-    // 用 AES-GCM 加密 password 字串
-    const iv = crypto.getRandomValues(new Uint8Array(12));  // 隨機初始化向量
-    const encrypted = await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv },
-        key,
-        enc.encode(password)
-    );
-
-    return { iv: Array.from(iv), salt: Array.from(salt), data: Array.from(new Uint8Array(encrypted)) };
-}
-
-
-// 設置密碼並加密存儲
-async function setPassword(password) {
-    const key = await encryptPassword(password); // 加密密碼
-    const encryptedPassword = JSON.stringify(key); // 可以根據需求對密鑰進行序列化
-    localStorage.setItem("encryptedPassword", encryptedPassword); // 存儲加密密鑰
-    alert("密碼已設置！");
-}
-
-// 設置密碼的界面
-function setupPassword() {
-    const password = prompt("請設置密碼");
-    if (password) {
-        setPassword(password);
-    }
-}
-
-
-
-/* ========= 密碼確認（刪除所有筆記）  ========= */
-
-// 密碼解密函式
-async function decryptPassword(encryptedPassword, inputPassword) {
-    const enc = new TextEncoder();
-    const salt = new Uint8Array(encryptedPassword.salt);
-    const baseKey = await crypto.subtle.importKey("raw", enc.encode(inputPassword), "PBKDF2", false, ["deriveKey"]);
-    
-    // 派生 AES 密鑰
-    const key = await crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
-        baseKey,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["encrypt", "decrypt"]
-    );
-
-    // 解密密碼
-    const iv = new Uint8Array(encryptedPassword.iv);
-    const data = new Uint8Array(encryptedPassword.data);
-    try {
-        const decryptedBuffer = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
-        const decryptedPassword = new TextDecoder().decode(decryptedBuffer);
-        return decryptedPassword === inputPassword;  // 比對解密後的密碼
-    } catch (e) {
-        return false;  // 密碼錯誤
-    }
-}
-
-
-// 密碼確認後執行刪除
-async function confirmPasswordAndDelete() {
-    const encryptedPassword = JSON.parse(localStorage.getItem("encryptedPassword"));
-    if (!encryptedPassword) {
-        // 密碼尚未設置，提示用戶設置密碼
-        const newPassword = prompt("密碼尚未設置，請設置新密碼。");
-
-        if (newPassword) {
-            const encrypted = await encryptPassword(newPassword);  // 將密碼加密
-            localStorage.setItem("encryptedPassword", JSON.stringify(encrypted));  // 儲存加密後的密碼
-            alert("密碼設置成功！請再次操作「全部刪除」。");
-        } else {
-            alert("密碼設置失敗，請重新設置！");
-        }
-
-        return;  // 跳過後續的刪除操作
-    }
-
-    const password = prompt("請輸入密碼進行確認");
-
-    if (password) {
-        const isValid = await decryptPassword(encryptedPassword, password);
-        if (isValid) {
-            if (confirm("確定要刪除所有筆記嗎？這個操作無法恢復！")) {
-                deleteAllNotes(); // 執行刪除操作
-            }
-        } else {
-            alert("密碼錯誤，操作取消！");
-        }
-    }
-}
-
-
-// 刪除所有筆記
-async function deleteAllNotes() {
-    if (!confirm("確定要刪除所有筆記嗎？這個操作無法恢復！")) return;
-
-    // 刪除所有筆記
-    const notes = await all();
-    const txObject = tx("readwrite");
-    notes.forEach(note => txObject.delete(note.id));  // 刪除所有筆記
-    alert("所有筆記已成功刪除！");
-    refresh();  // 重新整理列表
-}
-
-
-
-
-
-//====================================================
-
-  async function deleteCurrent(note) {
-    if (!confirm("確定刪除？")) return;
-    tx("readwrite").delete(note.id);
-    refresh();
-  }
-
-
-document.body.addEventListener('click', e => {
-  const clickInContextMenu = e.target.closest('#contextMenu');
-  const clickInTopMenu     = e.target.closest('#topMenu');
-  const clickInHeader      = e.target.closest('header');
-
-  if (!clickInContextMenu && !clickInTopMenu && !clickInHeader) {
-    menu.style.display = "none";
-    topMenu.style.display = "none"; // 如果你想在點空白時同時隱藏上方功能
-  }
-});
-
-/* ========= Export / Import ========= */
-function downloadFile(c,f){
- const b=new Blob([c],{type:"application/json"});
- const u=URL.createObjectURL(b);
- const a=document.createElement("a");a.href=u;a.download=f;
- document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
-}
-
-
-
-async function exportAllNotes() {
-    const ns = await all();
-    const upw = prompt("輸入原解密密碼（若有加密）");
-    if (upw === null) return;
-    const bpw = prompt("輸入備份密碼");
-    if (!bpw) return;
-
-    const out = {};
-
-    for (const n of ns) {
-        try {
-            let txt = (n.content ?? "").toString(); // 確保是字串
-
-            // 先解密（如果是加密筆記）
-            if (n.encrypted) {
-                txt = await decryptText(n.content, upw);
-            }
-
-            // 🔹 避免超大影片或圖片造成加密失敗
-            const div = document.createElement("div");
-            div.innerHTML = txt;
-
-            // 移除影片（避免大檔案）
-            div.querySelectorAll("video").forEach(v => v.remove());
-
-            // 移除過大的圖片（例如 base64 超過 100 KB 可調整）
-            div.querySelectorAll("img").forEach(img => {
-                if (img.src.length > 100000) img.remove();
-            });
-
-            txt = div.innerHTML;
-
-            // 加密筆記內容
-            const enc = await encryptText(txt, bpw);
-
-            out[n.id] = {
-                title: n.title || "",
-                timestamp: n.timestamp,
-                content: "enc:" + JSON.stringify(enc)
-            };
-        } catch (e) {
-            console.warn(`筆記「${n.title || n.id}」匯出失敗，已跳過`, e);
-            continue; // 遇到問題筆記略過，不中止整個匯出
-        }
-    }
-
-    if (Object.keys(out).length === 0) {
-        alert("沒有筆記成功匯出！");
-        return;
-    }
-
-    downloadFile(JSON.stringify(out, null, 2), "notes-backup.json");
-    alert("匯出完成！大檔影片已自動排除，文字與小圖片已備份。");
-}
-
-
-
-
-document.getElementById("backupFile").onchange=async e=>{
- const f=e.target.files[0]; if(!f)return;
- const pw=prompt("輸入備份密碼"); if(!pw)return;
- const data=JSON.parse(await f.text());
- if(data.content){
-  const t=await decryptText(JSON.parse(data.content.slice(4)),pw);
-  save({id:Date.now().toString(),title:data.title,content:t,encrypted:false,timestamp:Date.now()});
- }else{
-  for(const k in data){
-   const t=await decryptText(JSON.parse(data[k].content.slice(4)),pw);
-   save({id:k,title:data[k].title,content:t,encrypted:false,timestamp:data[k].timestamp});
-  }
- }
- refresh();
-};
-
-
-
-/* =========記錄游標位置（任何輸入時） ========= */
-contentI.addEventListener("keyup", saveSelection);
-contentI.addEventListener("mouseup", saveSelection);
-
-function saveSelection() {
-  const sel = window.getSelection();
-  if (sel.rangeCount > 0) {
-    savedRange = sel.getRangeAt(0);
-  }
-}
-
-
-
-
-/* =========JS（表格右鍵） ========= */
-
-let activeCell = null;
-let activeTable = null;
-let activeMedia = null;
-
-contentI.addEventListener("contextmenu", e => {
-  const td = e.target.closest("td.data-cell");
-  const media = e.target.closest("img, video");
-
-  // ================= 表格右鍵 =================
-  if (td) {
-    // ⭐ 完全接管右鍵行為
-    e.preventDefault();
-    e.stopPropagation();
-
-    activeTable = td.closest("table");
-    activeMedia = null;
-
-    const selected = getSelectedDataCells();
-
-    // 👉 如果目前沒有任何選取，才選取右鍵那格
-    if (selected.length === 0) {
-      clearCellSelection();
-      td.classList.add("selected");
-      anchorCell = td;
-    }
-
-    // 👉 activeCell 永遠指向 selection 的左上角（穩定）
-    const cells = getSelectedDataCells();
-    if (cells.length > 0) {
-      activeCell = cells[0];
-    }
-
-    // 顯示表格右鍵選單
-    const menu = document.getElementById("tableMenu");
-    menu.style.left = e.clientX + "px";
-    menu.style.top = e.clientY + "px";
-    menu.style.display = "block";
-
-    // 隱藏 media menu
-    document.getElementById("mediaMenu").style.display = "none";
-    return;
-  }
-
-  // ================= 圖片 / 影片右鍵 =================
-  if (media) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    activeMedia = media;
-    activeCell = null;
-    activeTable = null;
-
-    const menu = document.getElementById("mediaMenu");
-    menu.style.left = e.clientX + "px";
-    menu.style.top = e.clientY + "px";
-    menu.style.display = "block";
-
-    document.getElementById("tableMenu").style.display = "none";
-    return;
-  }
-});
-
-
-// 點空白處關閉所有選單
-document.addEventListener("click", () => {
-  document.getElementById("tableMenu").style.display = "none";
-  document.getElementById("mediaMenu").style.display = "none";
-});
-
-
-
-/* ========= 表格右鍵：合併 / 分割 / 刪除 / 插入列欄 ========= */
-document.getElementById("tableMenu").onclick = e => {
-  const act = e.target.dataset.act;
-  if (!act) return;
-
-  let didAction = false;
-
-  // 👉 合併（使用 selected cells）
-  if (act === "merge") {
-    mergeSelectedCells();
-    didAction = true;
-  }
-
-  // 👉 分割（仍以 activeCell 為主）
-  if (act === "split") {
-    if (activeCell) {
-      splitCell(activeCell);
-      didAction = true;
-    }
-  }
-
-  // 👉 刪除（selected 為主）
-  if (act === "delete") {
-    deleteSelectedCells();
-    didAction = true;
-  }
-
-  // ---------- 插入列 / 欄（需要 activeCell） ----------
-  if (
-    act === "add-col-left" ||
-    act === "add-col-right" ||
-    act === "add-row-up" ||
-    act === "add-row-down"
-  ) {
-    if (!activeCell) return;
-
-    const table = activeCell.closest("table");
-    const col = activeCell.cellIndex;
-    const row = activeCell.parentElement.rowIndex;
-
-    if (act === "add-col-left") addColumn(table, col);
-    if (act === "add-col-right") addColumn(table, col + 1);
-    if (act === "add-row-up") addRow(table, row);
-    if (act === "add-row-down") addRow(table, row + 1);
-
-    addColumnResizers(table);
-    addRowResizers(table);
-
-    didAction = true;
-  }
-
-  // ⭐ 只有真的「改動表格」才 reset
-  if (didAction) {
-    resetTableSelectionState();
-    contentI.dispatchEvent(new Event("input"));
-  }
-};
-
-
-
-
-// 新增一列（Row）
-
-function addRow(table, index = null) {
-  const row = table.rows[0];
-  const tr = document.createElement("tr");
-
-  for (let i = 0; i < row.cells.length; i++) {
-    const td = document.createElement("td");
-    td.contentEditable = "true";
-    td.style.border = "1px solid #ccc";
-    td.style.padding = "6px 8px";
-    tr.appendChild(td);
-  }
-
-  if (index === null) table.appendChild(tr);
-  else table.insertBefore(tr, table.rows[index]);
-}
-
-
-
-// 新增一欄（Column）
-
-function addColumn(table, index = null) {
-  Array.from(table.rows).forEach(row => {
-    const td = document.createElement("td");
-    td.contentEditable = "true";
-    td.style.border = "1px solid #ccc";
-    td.style.padding = "6px 8px";
-
-    if (index === null) row.appendChild(td);
-    else row.insertBefore(td, row.cells[index]);
-  });
-}
-
-
-
-
-/* ========= Editor Toolbar Functions ========= */
-/* ========= 編輯器 Toolbar 功能 ========= */
-
-function formatText(cmd){
-  document.execCommand(cmd, false, null);
-}
-
-function changeFontSize(increase=true){
-  const sel = window.getSelection();
-  if(!sel.rangeCount) return;
-
-  // execCommand("fontSize") 範圍 1~7
-  // 3 是預設，5 大，7 更大
-  document.execCommand("fontSize", false, increase ? "5" : "3");
-}
-
 
 //==== 2. 表格設置，並加入合併/分割功能====完全符合 Excel 式的表格結構
 
@@ -1422,6 +202,8 @@ contentI.addEventListener("focus", () => {
 
 
 
+let longPressTimer = null;
+const LONG_PRESS_TIME = 500; // ms
 
 
 function startLongPress(e, td) {
@@ -1443,32 +225,18 @@ function cancelLongPress() {
 }
 
 
-// ===== 📱 Mobile Excel-like 表格選取（最終穩定版）=====
-
-let mobileDragMode = null; // "row" | "col"
-
-
 let mobileSelecting = false;
 let mobileStartCell = null;
-let longPressTimer = null;
+let mobileHasMoved = false;
 
-let touchStartX = 0;
-let touchStartY = 0;
-let mobileDragMode = null; // ⭐ 新增：row / col
-
-const MOVE_THRESHOLD = 6;
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
   mobileSelecting = true;
+  mobileHasMoved = false;
   mobileStartCell = td;
-  mobileDragMode = null;
-
-  const t = e.touches[0];
-  touchStartX = t.clientX;
-  touchStartY = t.clientY;
 
   clearCellSelection();
   td.classList.add("selected");
@@ -1476,93 +244,37 @@ contentI.addEventListener("touchstart", e => {
   anchorCell = td;
   activeCell = td;
 
-  longPressTimer = setTimeout(() => {
-    handleTableContextMenu(e, td);
-  }, 500);
+  // ⭐ 啟動長按（但先不要 preventDefault）
+  startLongPress(e, td);
 });
 
+
 contentI.addEventListener("touchmove", e => {
-  if (!mobileSelecting || !mobileStartCell) return;
+  if (!mobileSelecting) return;
 
-  const t = e.touches[0];
+  mobileHasMoved = true;
+  cancelLongPress();
 
-  // ⭐ 只要開始拖，就要 preventDefault
-  e.preventDefault();
-
-  const dx = t.clientX - touchStartX;
-  const dy = t.clientY - touchStartY;
-
-  if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
-
-  // ⭐ 取消長按
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
-
-  // ⭐ 決定方向
-  if (!mobileDragMode) {
-    mobileDragMode = Math.abs(dx) > Math.abs(dy) ? "row" : "col";
-  }
-
-  const td = getCellFromTouch(t);
+  const touch = e.touches[0];
+  const td = getCellFromTouch(touch);
   if (!td) return;
 
   clearCellSelection();
+  selectRect(mobileStartCell, td);
 
-  if (mobileDragMode === "row") {
-    const target =
-      mobileStartCell.parentElement.cells[td.cellIndex];
-    if (target) {
-      selectRect(mobileStartCell, target);
-    }
-  } else {
-    const table = mobileStartCell.closest("table");
-    const target =
-      table.rows[td.parentElement.rowIndex]
-           ?.cells[mobileStartCell.cellIndex];
-    if (target) {
-      selectRect(mobileStartCell, target);
-    }
-  }
+  // ⭐ 只有真的拖動，才阻止畫面
+  e.preventDefault();
 }, { passive: false });
+
 
 
 function endMobileSelection() {
   mobileSelecting = false;
   mobileStartCell = null;
-  mobileDragMode = null;
-
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
-  }
 }
 
 contentI.addEventListener("touchend", endMobileSelection);
 contentI.addEventListener("touchcancel", endMobileSelection);
-
-// =================手機拖曳一定要用 elementFromPoint =========================
-
-function getCellFromTouch(touch) {
-  const el = document.elementFromPoint(
-    touch.clientX,
-    touch.clientY
-  );
-  if (!el) return null;
-  return el.closest("td.data-cell");
-}
-
-
-
-
-
-
-
-
-
-// ================= 手機拖曳一定要用 elementFromPoint =========================
-
 
 
 //  touchend（分流「拖曳」vs「長按」）
@@ -1579,10 +291,6 @@ contentI.addEventListener("touchend", e => {
 });
 
 
-
-
-// ===== touchend:放開->取消長按=====
-
 contentI.addEventListener("touchend", () => {
   cancelLongPress();
 
@@ -1590,10 +298,6 @@ contentI.addEventListener("touchend", () => {
   mobileStartCell = null;
 });
 
-
-
-// ===== 把「右鍵邏輯」抽成共用function=====
-// =====新增這個function (桌機/手機共用)=====
 
 function handleTableContextMenu(e, td) {
   e.preventDefault();
@@ -1624,9 +328,6 @@ function handleTableContextMenu(e, td) {
   document.getElementById("mediaMenu").style.display = "none";
 }
 
-// ===== 桌機的contextmenu 改成「呼叫共函式」=====
-// =====更新你的contextmenu (重點)=====
-
 contentI.addEventListener("contextmenu", e => {
   const td = e.target.closest("td.data-cell");
   const media = e.target.closest("img, video");
@@ -1654,15 +355,6 @@ contentI.addEventListener("contextmenu", e => {
 });
 
 
-//==========================================================================================
-
-
-
-
-
-
-
-//  矩形選取的核心邏輯
 function selectRect(cellA, cellB) {
   const table = cellA.closest("table");
 
@@ -1686,8 +378,6 @@ function selectRect(cellA, cellB) {
   }
 }
 
-
-
 contentI.addEventListener("pointerdown", e => {
   // ⭐ 手機不走 pointer 選取
   if (e.pointerType === "touch") return;
@@ -1702,10 +392,6 @@ contentI.addEventListener("pointerdown", e => {
   dragStartCell = td;
   isDragging = true;
 });
-
-
-
-
 
 contentI.addEventListener("pointermove", e => {
   if (!isDragging) return;
@@ -1724,26 +410,11 @@ document.addEventListener("pointerup", () => {
 });
 
 
-
-
-
-
-
-
-// ===== 清除所有選取 =====
 function clearCellSelection() {
   document
     .querySelectorAll(".note-table td.selected")
     .forEach(td => td.classList.remove("selected"));
 }
-
-
-
-
-//==========================================================================
-
-
-
 
 
 function addRowResizers(table) {
@@ -1777,8 +448,6 @@ function addRowResizers(table) {
 }
 
 
-
-
 function placeCaretInsideCell(td) {
   td.focus();
 
@@ -1796,11 +465,9 @@ function placeCaretInsideCell(td) {
 
 
 
-//   像 Excel 一樣「選取多個儲存格再合併 / 分割」 ===============================
-
 let selectedCells = new Set();
 
-// ===== 滑鼠選取（儲存格 / 整表）=====
+
 contentI.addEventListener("mousedown", e => {
 
   // ⭐ 手機不處理 mouse 流程
@@ -1823,12 +490,10 @@ contentI.addEventListener("mousedown", e => {
     return;
   }
 
-  // ---------- 2️⃣ 儲存格選取（你原本的邏輯） ----------
+
   const td = e.target.closest("td");
   if (!td) return;
-
-  // 右鍵不處理（非常重要）
-  if (e.button === 2) return;
+   if (e.button === 2) return;
 
   if (!e.ctrlKey && !e.metaKey) {
     clearCellSelection();
@@ -1838,9 +503,6 @@ contentI.addEventListener("mousedown", e => {
   activeCell = td;
   activeTable = td.closest("table");
 });
-
-
-
 
 function toggleCellSelection(td) {
   if (selectedCells.has(td)) {
@@ -1853,26 +515,19 @@ function toggleCellSelection(td) {
 }
 
 
-
-// 取得目前選取的「資料格」
 function getSelectedDataCells() {
   return Array.from(
     document.querySelectorAll(".note-table td.selected.data-cell")
   );
 }
 
-// 清除所有選取
+
 function clearCellSelection() {
   document
     .querySelectorAll(".note-table td.selected")
     .forEach(td => td.classList.remove("selected"));
 }
 
-
-
-
-
-// 水平合併（同一列）
 function mergeSelectedCells() {
   const cells = getSelectedDataCells();
   if (cells.length < 2) {
@@ -1905,13 +560,11 @@ function mergeSelectedCells() {
       }
     }
   }
-
-  // 左上角儲存格保留
   const master = table.rows[minRow].cells[minCol];
   master.rowSpan = maxRow - minRow + 1;
   master.colSpan = maxCol - minCol + 1;
 
-  // 移除其他儲存格
+
   cells.forEach(cell => {
     if (cell !== master) {
       cell.remove();
@@ -1922,8 +575,6 @@ function mergeSelectedCells() {
 }
 
 
-
-// 垂直合併（最小可用版本）
 function mergeSelectedCellsVertical() {
   if (selectedCells.size < 2) {
     alert("請選取多個儲存格");
@@ -1951,10 +602,6 @@ function mergeSelectedCellsVertical() {
 }
 
 
-
-
-
-// 分割（針對 activeCell）
 function splitCell(cell) {
   const span = cell.colSpan || 1;
   if (span <= 1) return;
@@ -1983,7 +630,6 @@ function deleteSelectedCells() {
 // Enter / Tab 行為（像 Excel）
 contentI.addEventListener("keydown", e => {
 
-  /* ================= Undo / Redo（最高優先） ================= */
   if (e.ctrlKey || e.metaKey) {
     const key = e.key.toLowerCase();
 
@@ -2021,11 +667,8 @@ function placeCaretAtEnd(el) {
   sel.addRange(range);
 }
 
-
-  /* ================= 表格快捷（次優先） ================= */
   if (!activeCell) return;
 
-  // ---------- Tab：同列往右 ----------
   if (e.key === "Tab") {
     e.preventDefault();
 
@@ -2036,8 +679,6 @@ function placeCaretAtEnd(el) {
     }
     return;
   }
-
-  // ---------- Enter：同欄往下 ----------
   if (e.key === "Enter") {
     e.preventDefault();
 
@@ -2055,8 +696,6 @@ function placeCaretAtEnd(el) {
 });
 
 
-
-// 在「點擊 td」時同步 activeCell
 contentI.addEventListener("focusin", e => {
   // ⭐ 手機不在 focus 時做選取
   if ("ontouchstart" in window) return;
@@ -2067,13 +706,6 @@ contentI.addEventListener("focusin", e => {
   activeCell = td;
   activeTable = td.closest("table");
 });
-
-
-// =================================================================
-
-//加入Undo / Redo（Ctrl + Z） 
-//加入可以用鼠標表格整體選取/ 複製 / 
-//加入拖曳欄線調整欄寬 / 列高
 
 let undoStack = [];
 let redoStack = [];
@@ -2152,11 +784,6 @@ function stopResizeColumn() {
 }
 
 
-
-// =================================================================
-
-
-
 function insertImage(){
   document.getElementById("imgPicker").click();
 }
@@ -2220,9 +847,6 @@ contentI.dispatchEvent(new Event("input"));
 }
 
 
-
-
-
 //  自動儲存改成「用 currentId 存」
 let autoSaveTimer = null;
 
@@ -2245,10 +869,6 @@ function bindAutoSave(editorEl) {
     }, 600);
   };
 }
-
-
-
-
 
 
 // 設置編輯區功能
@@ -2302,8 +922,6 @@ function extractPreviewFromHTML(html){
 
 
 
-
-
 /* ========= 列表只依「文字段落」判斷行數 ========= */
 function extractTextLinesFromHTMLWithMedia(html){
   const div = document.createElement("div");
@@ -2336,8 +954,6 @@ function extractTextLinesFromHTMLWithMedia(html){
     firstMedia
   };
 }
-
-
 
 
 /* ========= 工具函式 ========= */
@@ -2449,7 +1065,6 @@ function addSwipeListeners(item, note){
     openEditor(note);
   });
 }
-
 
 
 /* ========= Editor Swipe Back (Safe Version) ========= */
@@ -2622,5 +1237,3 @@ openDB().then(refresh);
 
 </script>
 
-</body>
-</html>
