@@ -1472,6 +1472,8 @@ function cancelLongPress() {
 
 // ===== 手機拖曳選取邏輯 =====
 // ===== 📱 Mobile drag select + 自動顯示右鍵菜單 =====
+
+// ===== 📱 Mobile drag select + 自動顯示右鍵菜單 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1480,7 +1482,7 @@ contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  e.preventDefault(); // 🔥 iOS 必須
+  e.preventDefault(); // iOS 必須
 
   mobileSelecting = true;
   mobileHasMoved = false;
@@ -1496,7 +1498,7 @@ contentI.addEventListener("touchstart", e => {
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
-  e.preventDefault(); // 🔥 一定要有
+  e.preventDefault();
 
   const touch = e.touches[0];
   const td = getCellFromTouch(touch);
@@ -1508,24 +1510,32 @@ contentI.addEventListener("touchmove", e => {
   selectRect(mobileStartCell, td);
 }, { passive: false });
 
-// 手機 touchend（拖曳選取後自動顯示右鍵菜單）
 contentI.addEventListener("touchend", e => {
   if (!mobileSelecting) return;
 
-  const td = mobileStartCell;
+  // 🔹 先取得最後選取的格子
+  const selectedCells = getSelectedDataCells();
+  let lastCell = null;
 
-  // 🔹 結束選取
+  if (selectedCells.length) {
+    // 找矩形右下角的格子作為菜單參考
+    lastCell = selectedCells.reduce((acc, cell) => {
+      const r = cell.parentElement.rowIndex;
+      const c = cell.cellIndex;
+      if (!acc || r > acc.row || (r === acc.row && c > acc.col)) {
+        return { cell, row: r, col: c };
+      }
+      return acc;
+    }, null)?.cell;
+  }
+
+  // 🔹 清理拖曳狀態
   mobileSelecting = false;
   mobileStartCell = null;
 
   // 🔹 拖曳過才觸發右鍵菜單
-  if (mobileHasMoved && td) {
-    const selectedCells = getSelectedDataCells();
-    if (selectedCells.length) {
-      // 選取矩形右下角作為菜單位置
-      const lastCell = selectedCells[selectedCells.length - 1];
-      handleTableContextMenu(e, lastCell);
-    }
+  if (mobileHasMoved && lastCell) {
+    handleTableContextMenu(e, lastCell);
   }
 
   // 🔹 取消長按判斷
@@ -1533,11 +1543,9 @@ contentI.addEventListener("touchend", e => {
 });
 
 contentI.addEventListener("touchcancel", () => {
-  // 選取中斷時清理狀態
   mobileSelecting = false;
   mobileStartCell = null;
 });
-
 
 
 
