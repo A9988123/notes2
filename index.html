@@ -1659,29 +1659,39 @@ contentI.addEventListener("pointerdown", e => {
 
 
 
-
-
 contentI.addEventListener("pointermove", e => {
   if (!isDragging) return;
 
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  clearCellSelection();
-  selectRect(dragStartCell, td);
+  clearCellSelection();          // 清掉舊選取
+  selectRect(dragStartCell, td); // 選取矩形
+
+  // 🔥 同步更新 selectedCells Set
+  selectedCells.clear();
+  const table = dragStartCell.closest("table");
+  const r1 = dragStartCell.parentElement.rowIndex;
+  const c1 = dragStartCell.cellIndex;
+  const r2 = td.parentElement.rowIndex;
+  const c2 = td.cellIndex;
+  const rMin = Math.min(r1, r2);
+  const rMax = Math.max(r1, r2);
+  const cMin = Math.min(c1, c2);
+  const cMax = Math.max(c1, c2);
+
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      const cell = table.rows[r]?.cells[c];
+      if (cell && cell.classList.contains("data-cell")) {
+        selectedCells.add(cell);
+      }
+    }
+  }
+
+  // 🔥 最後把拖曳最後一格設為 activeCell
+  activeCell = td;
 });
-
-
-document.addEventListener("pointerup", () => {
-  isDragging = false;
-  dragStartCell = null;
-});
-
-
-
-
-
-
 
 
 // ===== 清除所有選取 =====
