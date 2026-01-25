@@ -1177,18 +1177,23 @@ contentI.addEventListener("contextmenu", e => {
   const td = e.target.closest("td.data-cell");
   const media = e.target.closest("img, video");
 
+  // 如果正在拖曳，先結束拖曳
+  if (isDragging) {
+    isDragging = false;
+    dragStartCell = null;
+    anchorCell = null;
+  }
+
   // ================= 表格右鍵 =================
   if (td) {
-    // ⭐ 完全接管右鍵行為
     e.preventDefault();
     e.stopPropagation();
 
     activeTable = td.closest("table");
     activeMedia = null;
 
-    const selected = getSelectedDataCells();
-
     // 👉 如果目前沒有任何選取，才選取右鍵那格
+    const selected = getSelectedDataCells();
     if (selected.length === 0) {
       clearCellSelection();
       td.classList.add("selected");
@@ -1230,6 +1235,7 @@ contentI.addEventListener("contextmenu", e => {
     return;
   }
 });
+
 
 
 // 點空白處關閉所有選單
