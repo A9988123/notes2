@@ -1473,8 +1473,7 @@ function cancelLongPress() {
 // ===== 手機拖曳選取邏輯 =====
 // ===== 📱 Mobile drag select + 自動顯示右鍵菜單 =====
 
-// ===== 📱 Mobile drag select + 自動顯示右鍵菜單 =====
-// ===== 📱 Mobile drag select + 自動右鍵菜單 =====
+// ===== 手機拖曳選取 + 自動跳出右鍵菜單 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1514,8 +1513,10 @@ contentI.addEventListener("touchmove", e => {
 contentI.addEventListener("touchend", e => {
   if (!mobileSelecting) return;
 
-  // 🔹 找矩形右下角的格子作為右鍵參考
+  // 🔹 拖曳結束前保留選取格
   const selectedCells = getSelectedDataCells();
+
+  // 🔹 找矩形右下角格子作為右鍵位置
   let lastCell = null;
   if (selectedCells.length) {
     lastCell = selectedCells.reduce((acc, cell) => {
@@ -1528,13 +1529,18 @@ contentI.addEventListener("touchend", e => {
     }, null)?.cell;
   }
 
-  // 🔹 清除拖曳狀態
+  // 🔹 拖曳狀態清除
   mobileSelecting = false;
   mobileStartCell = null;
 
-  // 🔹 拖曳過才觸發右鍵選單
+  // 🔹 拖曳過才顯示菜單
   if (mobileHasMoved && lastCell) {
-    handleTableContextMenu(e, lastCell);
+    // ⚠ 注意 touchend 沒有 touches，要用 changedTouches
+    handleTableContextMenu({
+      ...e,
+      clientX: e.changedTouches[0].clientX,
+      clientY: e.changedTouches[0].clientY
+    }, lastCell);
   }
 
   // 🔹 取消長按判斷
@@ -1545,7 +1551,6 @@ contentI.addEventListener("touchcancel", () => {
   mobileSelecting = false;
   mobileStartCell = null;
 });
-
 
 
 
