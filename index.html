@@ -1444,13 +1444,19 @@ function cancelLongPress() {
 
 
 // ===== 📱 Mobile Excel-like 表格選取（最終穩定版）=====
+
+let mobileDragMode = null; // "row" | "col"
+
+
 let mobileSelecting = false;
 let mobileStartCell = null;
 let longPressTimer = null;
 
 let touchStartX = 0;
 let touchStartY = 0;
-const MOVE_THRESHOLD = 6; // ⭐ 超過 6px 才算「真的在拖曳」
+let mobileDragMode = null; // ⭐ 新增：row / col
+
+const MOVE_THRESHOLD = 6;
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
@@ -1458,21 +1464,19 @@ contentI.addEventListener("touchstart", e => {
 
   mobileSelecting = true;
   mobileStartCell = td;
+  mobileDragMode = null;
 
   const t = e.touches[0];
   touchStartX = t.clientX;
   touchStartY = t.clientY;
 
-  // ✅【關鍵 1】單點一定要先清空，只亮一格
   clearCellSelection();
   td.classList.add("selected");
 
   anchorCell = td;
   activeCell = td;
 
-  // ⭐ 長按候選（但還不能確定）
   longPressTimer = setTimeout(() => {
-    // ⭐【關鍵 2】只有「完全沒移動」才允許跳選單
     handleTableContextMenu(e, td);
   }, 500);
 });
@@ -1481,31 +1485,52 @@ contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting || !mobileStartCell) return;
 
   const t = e.touches[0];
-  const dx = Math.abs(t.clientX - touchStartX);
-  const dy = Math.abs(t.clientY - touchStartY);
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
 
-  // ⭐【關鍵 3】一旦真的移動 → 進入拖曳模式
-  if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
-    // 取消長按
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-    }
+  if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
 
-    const td = getCellFromTouch(t);
-    if (!td) return;
-
-    // Excel 式矩形選取
-    clearCellSelection();
-    selectRect(mobileStartCell, td);
-
-    e.preventDefault(); // 防止畫面捲動
+  // ⭐ 一旦開始拖 → 取消長按
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
   }
+
+  // ⭐ 第一次移動：決定方向
+  if (!mobileDragMode) {
+    mobileDragMode = Math.abs(dx) > Math.abs(dy) ? "row" : "col";
+  }
+
+  const td = getCellFromTouch(t);
+  if (!td) return;
+
+  clearCellSelection();
+
+  if (mobileDragMode === "row") {
+    // ✅ 同一列，水平選取
+    selectRect(
+      mobileStartCell,
+      mobileStartCell.parentElement.cells[td.cellIndex]
+    );
+  } else {
+    // ✅ 同一欄，垂直選取
+    const table = mobileStartCell.closest("table");
+    const target =
+      table.rows[td.parentElement.rowIndex]?.cells[
+        mobileStartCell.cellIndex
+      ];
+    if (target) {
+      selectRect(mobileStartCell, target);
+    }
+  }
+
+  e.preventDefault();
 }, { passive: false });
 
 function endMobileSelection() {
   mobileSelecting = false;
   mobileStartCell = null;
+  mobileDragMode = null;
 
   if (longPressTimer) {
     clearTimeout(longPressTimer);
