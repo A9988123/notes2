@@ -1469,18 +1469,14 @@ function cancelLongPress() {
 
 
 // ===== 手機拖曳選取邏輯 =====
-// ===== 📱 Mobile drag select + 自動顯示右鍵菜單 =====
 
-// ===== 手機拖曳選取 + 自動跳出右鍵菜單 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
+let longPressTimer = null;
+const LONG_PRESS_DURATION = 500; // 手機長按 500ms
 
-
- let longPressTimer = null;
-const LONG_PRESS_DURATION = 500; // 毫秒
-
-// 手機 touchstart 監聽（長按判斷 + 拖曳選取）
+// ===== 手機 touchstart（長按判斷 + 拖曳選取） =====
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
@@ -1497,7 +1493,7 @@ contentI.addEventListener("touchstart", e => {
   anchorCell = td;
   activeCell = td;
 
-  // 🔹 啟動長按計時器
+  // 啟動長按計時器
   longPressTimer = setTimeout(() => {
     if (!mobileHasMoved && td) {
       handleTableContextMenu({
@@ -1509,26 +1505,25 @@ contentI.addEventListener("touchstart", e => {
   }, LONG_PRESS_DURATION);
 }, { passive: false });
 
+// ===== 手機 touchmove（拖曳選取時取消長按） =====
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
   e.preventDefault();
-
   const touch = e.touches[0];
   const td = getCellFromTouch(touch);
   if (!td) return;
 
   mobileHasMoved = true;
-
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
-  // 🔹 拖曳時取消長按
+  // 拖曳時取消長按
   clearTimeout(longPressTimer);
 });
 
+// ===== 手機 touchend（拖曳結束或單格長按結束） =====
 contentI.addEventListener("touchend", e => {
-  // 🔹 拖曳結束前保留選取格
   const selectedCells = getSelectedDataCells();
 
   let lastCell = null;
@@ -1543,12 +1538,11 @@ contentI.addEventListener("touchend", e => {
     }, null)?.cell;
   }
 
-  // 🔹 清除拖曳狀態與長按計時器
   mobileSelecting = false;
   mobileStartCell = null;
   clearTimeout(longPressTimer);
 
-  // 🔹 拖曳過才顯示菜單
+  // 拖曳選取才自動顯示右鍵菜單
   if (mobileHasMoved && lastCell) {
     handleTableContextMenu({
       ...e,
@@ -1560,6 +1554,7 @@ contentI.addEventListener("touchend", e => {
   cancelLongPress?.();
 });
 
+// ===== 手機 touchcancel（中斷時清理狀態） =====
 contentI.addEventListener("touchcancel", () => {
   mobileSelecting = false;
   mobileStartCell = null;
