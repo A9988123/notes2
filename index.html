@@ -1618,7 +1618,7 @@ contentI.addEventListener("touchcancel", () => {
 // 保存原格子內容和位置的 Map
 let mergedCellMap = new WeakMap();
 
-// ===== 合併格子 =====
+// 合併格子
 function mergeSelectedCells() {
   buildCellMatrix();
   const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
@@ -1634,23 +1634,17 @@ function mergeSelectedCells() {
     maxCol = Math.max(maxCol, pos.col);
   });
 
+  const topLeftCell = cellMatrix[minRow][minCol];
   const rowSpan = maxRow - minRow + 1;
   const colSpan = maxCol - minCol + 1;
 
-  const topLeftCell = cellMatrix[minRow][minCol];
-
-  // 先保存合併前的格子資料
+  // 保存原格子資料
   const cellsData = [];
   for (let r = minRow; r <= maxRow; r++) {
     for (let c = minCol; c <= maxCol; c++) {
       const td = cellMatrix[r][c];
       if (td && td !== topLeftCell) {
-        cellsData.push({
-          row: r,
-          col: c,
-          content: td.innerHTML,
-          parent: td.parentElement
-        });
+        cellsData.push({ row: r, col: c, content: td.innerHTML, parent: td.parentElement });
       }
     }
   }
@@ -1660,41 +1654,45 @@ function mergeSelectedCells() {
   topLeftCell.colSpan = colSpan;
 
   // 移除其他格子
-  for (let r = minRow; r <= maxRow; r++) {
-    for (let c = minCol; c <= maxCol; c++) {
-      const td = cellMatrix[r][c];
-      if (td && td !== topLeftCell) td.remove();
-    }
-  }
+  cellsData.forEach(d => d.parent.removeChild(cellMatrix[d.row][d.col]));
 
   clearCellSelection();
   topLeftCell.classList.add("selected");
   buildCellMatrix();
 }
 
-// ===== 拆分格子 =====
+// 拆分格子
 function splitCell(td) {
   buildCellMatrix();
 
-  // 取得合併前的格子資料
   const cellsData = mergedCellMap.get(td);
-  if (!cellsData || !td) return;
+  if (!cellsData) return;
 
-  // 拆分主格子
   td.rowSpan = 1;
   td.colSpan = 1;
 
-  // 還原其他格子
   cellsData.forEach(data => {
     const newTd = document.createElement("td");
     newTd.className = "data-cell";
     newTd.innerHTML = data.content || "";
     data.parent.insertBefore(newTd, data.parent.cells[data.col] || null);
+
+    // 重新綁定手機拖曳右鍵事件
+    bindMobileTouchEvents(newTd);
   });
 
   mergedCellMap.delete(td);
   buildCellMatrix();
   clearCellSelection();
+}
+
+
+// 手機拖曳/長按右鍵綁定函數
+function bindMobileTouchEvents(td) {
+  td.addEventListener("touchstart", handleTouchStart, { passive: false });
+  td.addEventListener("touchmove", handleTouchMove, { passive: false });
+  td.addEventListener("touchend", handleTouchEnd, { passive: false });
+  td.addEventListener("touchcancel", handleTouchCancel);
 }
 
 
