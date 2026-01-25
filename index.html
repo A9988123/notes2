@@ -1475,24 +1475,77 @@ let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
 let longPressTimer = null;
+let cellMatrix = []; // 表格映射矩陣
+
+// =================== 初始化表格映射矩陣 ===========================
+function buildCellMatrix() {
+  const rows = contentI.querySelectorAll("tr");
+  cellMatrix = [];
+  rows.forEach((tr, rowIdx) => {
+    const cells = Array.from(tr.cells);
+    let matrixRow = [];
+    let colIdx = 0;
+    cells.forEach(td => {
+      const rowSpan = td.rowSpan || 1;
+      const colSpan = td.colSpan || 1;
+      // 填充矩陣
+      for (let r = 0; r < rowSpan; r++) {
+        while (!cellMatrix[rowIdx + r]) cellMatrix[rowIdx + r] = [];
+        for (let c = 0; c < colSpan; c++) {
+          cellMatrix[rowIdx + r][colIdx + c] = td;
+        }
+      }
+      colIdx += colSpan;
+    });
+  });
+}
 
 
-// ===================== 統一顯示右鍵函數 =========================
+// ===== 清除所有選取 =====
+function clearCellSelection() {
+  contentI.querySelectorAll("td.selected").forEach(td => td.classList.remove("selected"));
+}
+
+
+// ===== 選取矩形範圍 =====
+function selectRect(startCell, endCell) {
+  clearCellSelection();
+  buildCellMatrix();
+
+  let startPos = findCellPosition(startCell);
+  let endPos = findCellPosition(endCell);
+  if (!startPos || !endPos) return;
+
+  const rowStart = Math.min(startPos.row, endPos.row);
+  const rowEnd = Math.max(startPos.row, endPos.row);
+  const colStart = Math.min(startPos.col, endPos.col);
+  const colEnd = Math.max(startPos.col, endPos.col);
+
+  for (let r = rowStart; r <= rowEnd; r++) {
+    for (let c = colStart; c <= colEnd; c++) {
+      const td = cellMatrix[r][c];
+      if (td) td.classList.add("selected");
+    }
+  }
+}
+
+// ===== 找到 td 在矩陣的位置 =====
+function findCellPosition(td) {
+  for (let r = 0; r < cellMatrix.length; r++) {
+    for (let c = 0; c < cellMatrix[r].length; c++) {
+      if (cellMatrix[r][c] === td) return { row: r, col: c };
+    }
+  }
+  return null;
+}
+
+// ===== 顯示右鍵選單 =====
 function showContextMenu(cell) {
   if (!cell) return;
   const rect = cell.getBoundingClientRect();
-
-  const fakeEvent = {
-    clientX: rect.left + rect.width / 2,
-    clientY: rect.top + rect.height / 2,
-    touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }],
-    target: cell,
-    type: "touch",
-    preventDefault: () => {},
-    stopPropagation: () => {}
-  };
-
-  handleTableContextMenu(fakeEvent, cell);
+  handleTableContextMenu({
+    touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }]
+  }, cell);
 }
 
 // ===== touchstart =====
@@ -1501,11 +1554,9 @@ contentI.addEventListener("touchstart", e => {
   if (!td) return;
 
   e.preventDefault();
-
   mobileSelecting = true;
   mobileHasMoved = false;
   mobileStartCell = td;
-
   clearCellSelection();
   td.classList.add("selected");
 
@@ -1526,7 +1577,6 @@ contentI.addEventListener("touchmove", e => {
   if (!td) return;
 
   mobileHasMoved = true;
-  clearCellSelection();
   selectRect(mobileStartCell, td);
 
   clearTimeout(longPressTimer);
@@ -1535,24 +1585,27 @@ contentI.addEventListener("touchmove", e => {
 // ===== touchend =====
 contentI.addEventListener("touchend", e => {
   clearTimeout(longPressTimer);
-
   if (!mobileStartCell) return;
 
-  const selectedCells = getSelectedDataCells();
-  if (selectedCells.length) {
-    // 拖曳多選或單格長按放手後，都顯示右鍵
-    const lastCell = selectedCells[selectedCells.length - 1];
+  const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
+  if (mobileHasMoved && selectedCells.length) {
+    // 右下角格子作為右鍵參考
+    let lastCell = selectedCells.reduce((acc, cell) => {
+      let pos = findCellPosition(cell);
+      if (!pos) return acc;
+      if (!acc || pos.row > acc.row || (pos.row === acc.row && pos.col > acc.col)) {
+        return { cell, row: pos.row, col: pos.col };
+      }
+      return acc;
+    }, null).cell;
+
     showContextMenu(lastCell);
   }
 
   mobileSelecting = false;
   mobileStartCell = null;
   mobileHasMoved = false;
-});
-
-
-
-
+}, { passive: false });
 
 // ===== touchcancel =====
 contentI.addEventListener("touchcancel", () => {
@@ -1562,6 +1615,64 @@ contentI.addEventListener("touchcancel", () => {
   mobileHasMoved = false;
 });
 
+// ===== 合併格子 =====
+function mergeSelectedCells() {
+  buildCellMatrix();
+  const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
+  if (!selectedCells.length) return;
+
+  let minRow = Infinity, maxRow = -1, minCol = Infinity, maxCol = -1;
+  selectedCells.forEach(td => {
+    const pos = findCellPosition(td);
+    if (!pos) return;
+    minRow = Math.min(minRow, pos.row);
+    maxRow = Math.max(maxRow, pos.row);
+    minCol = Math.min(minCol, pos.col);
+    maxCol = Math.max(maxCol, pos.col);
+  });
+
+  const rowSpan = maxRow - minRow + 1;
+  const colSpan = maxCol - minCol + 1;
+
+  const topLeftCell = cellMatrix[minRow][minCol];
+  topLeftCell.rowSpan = rowSpan;
+  topLeftCell.colSpan = colSpan;
+
+  for (let r = minRow; r <= maxRow; r++) {
+    for (let c = minCol; c <= maxCol; c++) {
+      const td = cellMatrix[r][c];
+      if (td !== topLeftCell) td.remove();
+    }
+  }
+  clearCellSelection();
+  topLeftCell.classList.add("selected");
+  buildCellMatrix();
+}
+
+// ===== 拆分格子 =====
+function splitCell(td) {
+  buildCellMatrix();
+  const pos = findCellPosition(td);
+  if (!pos) return;
+
+  const rowSpan = td.rowSpan || 1;
+  const colSpan = td.colSpan || 1;
+  td.rowSpan = 1;
+  td.colSpan = 1;
+
+  const tr = td.parentElement;
+  for (let r = 0; r < rowSpan; r++) {
+    for (let c = 0; c < colSpan; c++) {
+      if (r === 0 && c === 0) continue; // 保留原 td
+      let targetRow = tr.parentElement.rows[pos.row + r];
+      let newTd = document.createElement("td");
+      newTd.className = "data-cell";
+      newTd.textContent = ""; // 可保留原本資料
+      targetRow.insertBefore(newTd, targetRow.cells[pos.col + c] || null);
+    }
+  }
+  buildCellMatrix();
+}
 
 
 // =============================================================================================================================== 
@@ -1638,31 +1749,6 @@ contentI.addEventListener("contextmenu", e => {
 
 
 
-//  矩形選取的核心邏輯
-function selectRect(cellA, cellB) {
-  const table = cellA.closest("table");
-
-  const r1 = cellA.parentElement.rowIndex;
-  const c1 = cellA.cellIndex;
-  const r2 = cellB.parentElement.rowIndex;
-  const c2 = cellB.cellIndex;
-
-  const rMin = Math.min(r1, r2);
-  const rMax = Math.max(r1, r2);
-  const cMin = Math.min(c1, c2);
-  const cMax = Math.max(c1, c2);
-
-  for (let r = rMin; r <= rMax; r++) {
-    for (let c = cMin; c <= cMax; c++) {
-      const cell = table.rows[r]?.cells[c];
-      if (cell && cell.classList.contains("data-cell")) {
-        cell.classList.add("selected");
-      }
-    }
-  }
-}
-
-
 
 contentI.addEventListener("pointerdown", e => {
   // ⭐ 手機不走 pointer 選取
@@ -1698,21 +1784,6 @@ document.addEventListener("pointerup", () => {
   isDragging = false;
   dragStartCell = null;
 });
-
-
-
-
-
-
-
-
-// ===== 清除所有選取 =====
-function clearCellSelection() {
-  document
-    .querySelectorAll(".note-table td.selected")
-    .forEach(td => td.classList.remove("selected"));
-}
-
 
 
 
@@ -1846,52 +1917,6 @@ function clearCellSelection() {
 
 
 
-
-
-// 合併函數（保持原樣，只選取矩形格子合併）
-function mergeSelectedCells() {
-  const selectedCells = getSelectedDataCells();
-  if (!selectedCells.length) return;
-
-  // 計算選取矩形範圍
-  let minRow = Infinity, maxRow = -1;
-  let minCol = Infinity, maxCol = -1;
-
-  selectedCells.forEach(td => {
-    const r = td.parentElement.rowIndex;
-    const c = td.cellIndex;
-    minRow = Math.min(minRow, r);
-    maxRow = Math.max(maxRow, r);
-    minCol = Math.min(minCol, c);
-    maxCol = Math.max(maxCol, c);
-  });
-
-  const rowspan = maxRow - minRow + 1;
-  const colspan = maxCol - minCol + 1;
-
-  const table = selectedCells[0].closest("table");
-  const firstCell = table.rows[minRow].cells[minCol];
-
-  // 設定合併
-  firstCell.rowSpan = rowspan;
-  firstCell.colSpan = colspan;
-
-  // 移除其他被合併的 td
-  for (let r = minRow; r <= maxRow; r++) {
-    for (let c = minCol; c <= maxCol; c++) {
-      const td = table.rows[r].cells[c];
-      if (td && td !== firstCell) {
-        td.remove();
-      }
-    }
-  }
-
-  clearCellSelection();
-  firstCell.classList.add("selected");
-}
-
-
-
 // 垂直合併（最小可用版本）
 function mergeSelectedCellsVertical() {
   if (selectedCells.size < 2) {
@@ -1918,47 +1943,6 @@ function mergeSelectedCellsVertical() {
 
   clearCellSelection();
 }
-
-
-
-
-
-// 拆分函數（保證完全對稱）
-function splitCell(td) {
-  if (!td) return;
-
-  const colspan = td.colSpan || 1;
-  const rowspan = td.rowSpan || 1;
-
-  td.colSpan = 1;
-  td.rowSpan = 1;
-
-  const tr = td.parentElement;
-  const cellIndex = td.cellIndex;
-  const table = td.closest("table");
-
-  // 補回 colspan - 1 的欄位
-  for (let i = 1; i < colspan; i++) {
-    const newTd = document.createElement("td");
-    newTd.className = "data-cell";
-    newTd.textContent = ""; 
-    tr.insertBefore(newTd, tr.cells[cellIndex + i] || null);
-  }
-
-  // 補回 rowspan - 1 的列
-  for (let r = 1; r < rowspan; r++) {
-    const targetRow = table.rows[tr.rowIndex + r];
-    for (let c = 0; c < colspan; c++) {
-      const newTd = document.createElement("td");
-      newTd.className = "data-cell";
-      newTd.textContent = ""; 
-      const insertIndex = cellIndex + c;
-      targetRow.insertBefore(newTd, targetRow.cells[insertIndex] || null);
-    }
-  }
-}
-
-
 
 function deleteSelectedCells() {
   if (selectedCells.size === 0) return;
