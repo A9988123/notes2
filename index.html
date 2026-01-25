@@ -1147,6 +1147,15 @@ function saveSelection() {
 
 
 
+/* =========新增「用 touch 座標找 td」的工具函式========= */
+
+function getCellFromTouch(touch) {
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  if (!el) return null;
+  return el.closest("td.data-cell");
+}
+
+
 
 /* =========JS（表格右鍵） ========= */
 
@@ -1497,9 +1506,10 @@ contentI.addEventListener("touchmove", e => {
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
-  // ⭐ 只有真的拖動，才阻止畫面
+  // ⭐ 只有真的拖曳選取時才阻止畫面捲動
   e.preventDefault();
 }, { passive: false });
+
 
 
 
