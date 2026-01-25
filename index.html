@@ -1501,6 +1501,7 @@ function buildCellMatrix() {
 }
 
 
+
 // ===== 清除所有選取 =====
 function clearCellSelection() {
   contentI.querySelectorAll("td.selected").forEach(td => td.classList.remove("selected"));
@@ -1529,6 +1530,7 @@ function selectRect(startCell, endCell) {
   }
 }
 
+
 // ===== 找到 td 在矩陣的位置 =====
 function findCellPosition(td) {
   for (let r = 0; r < cellMatrix.length; r++) {
@@ -1539,6 +1541,7 @@ function findCellPosition(td) {
   return null;
 }
 
+
 // ===== 顯示右鍵選單 =====
 function showContextMenu(cell) {
   if (!cell) return;
@@ -1547,6 +1550,7 @@ function showContextMenu(cell) {
     touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }]
   }, cell);
 }
+
 
 // ===== touchstart =====
 contentI.addEventListener("touchstart", e => {
@@ -1567,6 +1571,7 @@ contentI.addEventListener("touchstart", e => {
   }, 500);
 }, { passive: false });
 
+
 // ===== touchmove =====
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
@@ -1581,6 +1586,7 @@ contentI.addEventListener("touchmove", e => {
 
   clearTimeout(longPressTimer);
 }, { passive: false });
+
 
 // ===== touchend =====
 contentI.addEventListener("touchend", e => {
@@ -1607,6 +1613,7 @@ contentI.addEventListener("touchend", e => {
   mobileHasMoved = false;
 }, { passive: false });
 
+
 // ===== touchcancel =====
 contentI.addEventListener("touchcancel", () => {
   clearTimeout(longPressTimer);
@@ -1614,6 +1621,7 @@ contentI.addEventListener("touchcancel", () => {
   mobileStartCell = null;
   mobileHasMoved = false;
 });
+
 
 // ===== 合併格子 =====
 function mergeSelectedCells() {
@@ -1649,6 +1657,7 @@ function mergeSelectedCells() {
   buildCellMatrix();
 }
 
+
 // ===== 拆分格子 =====
 function splitCell(td) {
   buildCellMatrix();
@@ -1673,6 +1682,7 @@ function splitCell(td) {
   }
   buildCellMatrix();
 }
+
 
 
 // =============================================================================================================================== 
