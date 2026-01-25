@@ -1469,7 +1469,6 @@ function cancelLongPress() {
 
 
 // ===== 手機拖曳選取邏輯 =====
-
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1489,16 +1488,14 @@ contentI.addEventListener("touchstart", e => {
   clearCellSelection();
   td.classList.add("selected");
 
-  anchorCell = td;
-  activeCell = td;
-
-  // 長按 500ms 才顯示右鍵
+  // 長按 500ms 顯示右鍵
   longPressTimer = setTimeout(() => {
     if (!mobileHasMoved && mobileStartCell) {
-      handleTableContextMenu(e, mobileStartCell);
+      handleTableContextMenu({
+        touches: [{ clientX: td.getBoundingClientRect().left + td.offsetWidth/2, clientY: td.getBoundingClientRect().top + td.offsetHeight/2 }]
+      }, mobileStartCell);
     }
   }, 500);
-
 }, { passive: false });
 
 // ===== touchmove =====
@@ -1507,15 +1504,14 @@ contentI.addEventListener("touchmove", e => {
   e.preventDefault();
 
   const touch = e.touches[0];
-  const td = getCellFromTouch(touch);
+  const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest("td.data-cell");
   if (!td) return;
 
   mobileHasMoved = true;
-
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
-  // 拖曳後不算長按
+  // 拖曳後取消長按
   clearTimeout(longPressTimer);
 }, { passive: false });
 
@@ -1526,9 +1522,8 @@ contentI.addEventListener("touchend", e => {
   if (!mobileStartCell) return;
 
   const selectedCells = getSelectedDataCells();
-
-  // 拖曳完成自動顯示右鍵選單
   if (mobileHasMoved && selectedCells.length) {
+    // 拖曳後，選取右下角格子作為右鍵參考
     const lastCell = selectedCells.reduce((acc, cell) => {
       const r = cell.parentElement.rowIndex;
       const c = cell.cellIndex;
@@ -1538,8 +1533,9 @@ contentI.addEventListener("touchend", e => {
       return acc;
     }, null).cell;
 
+    // 使用最後一個格子中心作為菜單位置
     handleTableContextMenu({
-      touches: [{ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY }]
+      touches: [{ clientX: lastCell.getBoundingClientRect().left + lastCell.offsetWidth/2, clientY: lastCell.getBoundingClientRect().top + lastCell.offsetHeight/2 }]
     }, lastCell);
   }
 
@@ -1555,6 +1551,8 @@ contentI.addEventListener("touchcancel", () => {
   mobileStartCell = null;
   mobileHasMoved = false;
 });
+
+
 
 
 // ===== 手機 touchcancel（中斷時清理狀態） =====
