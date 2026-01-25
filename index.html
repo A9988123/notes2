@@ -1485,18 +1485,22 @@ contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting || !mobileStartCell) return;
 
   const t = e.touches[0];
+
+  // ⭐ 只要開始拖，就要 preventDefault
+  e.preventDefault();
+
   const dx = t.clientX - touchStartX;
   const dy = t.clientY - touchStartY;
 
   if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
 
-  // ⭐ 一旦開始拖 → 取消長按
+  // ⭐ 取消長按
   if (longPressTimer) {
     clearTimeout(longPressTimer);
     longPressTimer = null;
   }
 
-  // ⭐ 第一次移動：決定方向
+  // ⭐ 決定方向
   if (!mobileDragMode) {
     mobileDragMode = Math.abs(dx) > Math.abs(dy) ? "row" : "col";
   }
@@ -1507,25 +1511,22 @@ contentI.addEventListener("touchmove", e => {
   clearCellSelection();
 
   if (mobileDragMode === "row") {
-    // ✅ 同一列，水平選取
-    selectRect(
-      mobileStartCell,
-      mobileStartCell.parentElement.cells[td.cellIndex]
-    );
+    const target =
+      mobileStartCell.parentElement.cells[td.cellIndex];
+    if (target) {
+      selectRect(mobileStartCell, target);
+    }
   } else {
-    // ✅ 同一欄，垂直選取
     const table = mobileStartCell.closest("table");
     const target =
-      table.rows[td.parentElement.rowIndex]?.cells[
-        mobileStartCell.cellIndex
-      ];
+      table.rows[td.parentElement.rowIndex]
+           ?.cells[mobileStartCell.cellIndex];
     if (target) {
       selectRect(mobileStartCell, target);
     }
   }
-
-  e.preventDefault();
 }, { passive: false });
+
 
 function endMobileSelection() {
   mobileSelecting = false;
@@ -1541,7 +1542,26 @@ function endMobileSelection() {
 contentI.addEventListener("touchend", endMobileSelection);
 contentI.addEventListener("touchcancel", endMobileSelection);
 
-// ================= 手機 touch 選取 & 長按 =========================
+// =================手機拖曳一定要用 elementFromPoint =========================
+
+function getCellFromTouch(touch) {
+  const el = document.elementFromPoint(
+    touch.clientX,
+    touch.clientY
+  );
+  if (!el) return null;
+  return el.closest("td.data-cell");
+}
+
+
+
+
+
+
+
+
+
+// ================= 手機拖曳一定要用 elementFromPoint =========================
 
 
 
