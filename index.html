@@ -1557,6 +1557,26 @@ contentI.addEventListener("touchcancel", () => {
   mobileHasMoved = false;
 });
 
+// ===== 統一顯示右鍵函數 =====
+function showContextMenu(cell) {
+  if (!cell) return;
+  const rect = cell.getBoundingClientRect();
+
+  // 模擬一個事件物件，保證 handleTableContextMenu 不會報錯
+  const fakeEvent = {
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    target: cell,
+    type: "touch",
+    preventDefault: () => {},
+    stopPropagation: () => {}
+  };
+
+  handleTableContextMenu(fakeEvent, cell);
+}
+sss
+
+
 
 
 
