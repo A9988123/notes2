@@ -1468,8 +1468,7 @@ function cancelLongPress() {
 
 
 
-// ============== 手機拖曳選取邏輯 ==============================================================================================
-
+// ===== 手機拖曳選取邏輯 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1493,13 +1492,8 @@ contentI.addEventListener("touchstart", e => {
   longPressTimer = setTimeout(() => {
     if (!mobileHasMoved && mobileStartCell) {
       handleTableContextMenu({
-        touches: [{ 
-          clientX: td.getBoundingClientRect().left + td.offsetWidth/2, 
-          clientY: td.getBoundingClientRect().top + td.offsetHeight/2 
-        }]
+        touches: [{ clientX: td.getBoundingClientRect().left + td.offsetWidth/2, clientY: td.getBoundingClientRect().top + td.offsetHeight/2 }]
       }, mobileStartCell);
-      mobileSelecting = false;   // 已觸發右鍵，取消拖曳選取狀態
-      mobileStartCell = null;
     }
   }, 500);
 }, { passive: false });
@@ -1528,33 +1522,21 @@ contentI.addEventListener("touchend", e => {
   if (!mobileStartCell) return;
 
   const selectedCells = getSelectedDataCells();
+  if (mobileHasMoved && selectedCells.length) {
+    // 拖曳後，選取右下角格子作為右鍵參考
+    const lastCell = selectedCells.reduce((acc, cell) => {
+      const r = cell.parentElement.rowIndex;
+      const c = cell.cellIndex;
+      if (!acc || r > acc.row || (r === acc.row && c > acc.col)) {
+        return { cell, row: r, col: c };
+      }
+      return acc;
+    }, null).cell;
 
-  // 拖曳後或單格長按後觸發右鍵
-  if (selectedCells.length) {
-    let targetCell;
-
-    if (mobileHasMoved) {
-      // 拖曳選取 → 取右下角格子
-      targetCell = selectedCells.reduce((acc, cell) => {
-        const r = cell.parentElement.rowIndex;
-        const c = cell.cellIndex;
-        if (!acc || r > acc.row || (r === acc.row && c > acc.col)) {
-          return { cell, row: r, col: c };
-        }
-        return acc;
-      }, null).cell;
-    } else {
-      // 單格長按 → 取起始格子
-      targetCell = mobileStartCell;
-    }
-
-    // 彈出右鍵選單
+    // 使用最後一個格子中心作為菜單位置
     handleTableContextMenu({
-      touches: [{ 
-        clientX: targetCell.getBoundingClientRect().left + targetCell.offsetWidth/2, 
-        clientY: targetCell.getBoundingClientRect().top + targetCell.offsetHeight/2 
-      }]
-    }, targetCell);
+      touches: [{ clientX: lastCell.getBoundingClientRect().left + lastCell.offsetWidth/2, clientY: lastCell.getBoundingClientRect().top + lastCell.offsetHeight/2 }]
+    }, lastCell);
   }
 
   mobileSelecting = false;
@@ -1571,7 +1553,7 @@ contentI.addEventListener("touchcancel", () => {
 });
 
 
-//==============================================================================================================================
+
 
 // ===== 手機 touchcancel（中斷時清理狀態） =====
 contentI.addEventListener("touchcancel", () => {
