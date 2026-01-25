@@ -1848,53 +1848,46 @@ function clearCellSelection() {
 
 
 
-// 水平合併（同一列）
+// 合併函數（保持原樣，只選取矩形格子合併）
 function mergeSelectedCells() {
-  const cells = getSelectedDataCells();
-  if (cells.length < 2) {
-    alert("請選取多個儲存格");
-    return;
-  }
+  const selectedCells = getSelectedDataCells();
+  if (!selectedCells.length) return;
 
-  const table = cells[0].closest("table");
+  // 計算選取矩形範圍
+  let minRow = Infinity, maxRow = -1;
+  let minCol = Infinity, maxCol = -1;
 
-  // 取得所有 row / col index
-  const rows = cells.map(c => c.parentElement.rowIndex);
-  const cols = cells.map(c => c.cellIndex);
-
-  const minRow = Math.min(...rows);
-  const maxRow = Math.max(...rows);
-  const minCol = Math.min(...cols);
-  const maxCol = Math.max(...cols);
-
-  // 驗證是否為「完整矩形」
-  for (let r = minRow; r <= maxRow; r++) {
-    for (let c = minCol; c <= maxCol; c++) {
-      const cell = table.rows[r]?.cells[c];
-      if (!cell || !cell.classList.contains("data-cell")) {
-        alert("選取範圍必須是完整矩形");
-        return;
-      }
-      if (!cell.classList.contains("selected")) {
-        alert("選取範圍必須是完整矩形");
-        return;
-      }
-    }
-  }
-
-  // 左上角儲存格保留
-  const master = table.rows[minRow].cells[minCol];
-  master.rowSpan = maxRow - minRow + 1;
-  master.colSpan = maxCol - minCol + 1;
-
-  // 移除其他儲存格
-  cells.forEach(cell => {
-    if (cell !== master) {
-      cell.remove();
-    }
+  selectedCells.forEach(td => {
+    const r = td.parentElement.rowIndex;
+    const c = td.cellIndex;
+    minRow = Math.min(minRow, r);
+    maxRow = Math.max(maxRow, r);
+    minCol = Math.min(minCol, c);
+    maxCol = Math.max(maxCol, c);
   });
 
+  const rowspan = maxRow - minRow + 1;
+  const colspan = maxCol - minCol + 1;
+
+  const table = selectedCells[0].closest("table");
+  const firstCell = table.rows[minRow].cells[minCol];
+
+  // 設定合併
+  firstCell.rowSpan = rowspan;
+  firstCell.colSpan = colspan;
+
+  // 移除其他被合併的 td
+  for (let r = minRow; r <= maxRow; r++) {
+    for (let c = minCol; c <= maxCol; c++) {
+      const td = table.rows[r].cells[c];
+      if (td && td !== firstCell) {
+        td.remove();
+      }
+    }
+  }
+
   clearCellSelection();
+  firstCell.classList.add("selected");
 }
 
 
@@ -1930,21 +1923,41 @@ function mergeSelectedCellsVertical() {
 
 
 
-// 分割（針對 activeCell）
-function splitCell(cell) {
-  const span = cell.colSpan || 1;
-  if (span <= 1) return;
+// 拆分函數（保證完全對稱）
+function splitCell(td) {
+  if (!td) return;
 
-  cell.colSpan = 1;
+  const colspan = td.colSpan || 1;
+  const rowspan = td.rowSpan || 1;
 
-  for (let i = 1; i < span; i++) {
-    const td = document.createElement("td");
-    td.contentEditable = "true";
-    td.style.border = "1px solid #ccc";
-    td.style.padding = "6px";
-    cell.parentElement.insertBefore(td, cell.nextSibling);
+  td.colSpan = 1;
+  td.rowSpan = 1;
+
+  const tr = td.parentElement;
+  const cellIndex = td.cellIndex;
+  const table = td.closest("table");
+
+  // 補回 colspan - 1 的欄位
+  for (let i = 1; i < colspan; i++) {
+    const newTd = document.createElement("td");
+    newTd.className = "data-cell";
+    newTd.textContent = ""; 
+    tr.insertBefore(newTd, tr.cells[cellIndex + i] || null);
+  }
+
+  // 補回 rowspan - 1 的列
+  for (let r = 1; r < rowspan; r++) {
+    const targetRow = table.rows[tr.rowIndex + r];
+    for (let c = 0; c < colspan; c++) {
+      const newTd = document.createElement("td");
+      newTd.className = "data-cell";
+      newTd.textContent = ""; 
+      const insertIndex = cellIndex + c;
+      targetRow.insertBefore(newTd, targetRow.cells[insertIndex] || null);
+    }
   }
 }
+
 
 
 function deleteSelectedCells() {
