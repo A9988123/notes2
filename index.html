@@ -1473,10 +1473,8 @@ function cancelLongPress() {
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
-let longPressTimer = null;
-const LONG_PRESS_DURATION = 500; // 手機長按 500ms
 
-// ===== 手機 touchstart（長按判斷 + 拖曳選取） =====
+// touchstart：開始選取
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
@@ -1492,66 +1490,49 @@ contentI.addEventListener("touchstart", e => {
 
   anchorCell = td;
   activeCell = td;
-
-  // 啟動長按計時器
-  longPressTimer = setTimeout(() => {
-    if (!mobileHasMoved && td) {
-      handleTableContextMenu({
-        ...e,
-        clientX: e.touches[0].clientX,
-        clientY: e.touches[0].clientY
-      }, td);
-    }
-  }, LONG_PRESS_DURATION);
 }, { passive: false });
 
-// ===== 手機 touchmove（拖曳選取時取消長按） =====
+// touchmove：拖曳選取
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
-
   e.preventDefault();
+
   const touch = e.touches[0];
   const td = getCellFromTouch(touch);
   if (!td) return;
 
   mobileHasMoved = true;
+
   clearCellSelection();
   selectRect(mobileStartCell, td);
+}, { passive: false });
 
-  // 拖曳時取消長按
-  clearTimeout(longPressTimer);
-});
-
-// ===== 手機 touchend（拖曳結束或單格長按結束） =====
+// touchend：拖曳 / 長按選取後立即顯示右鍵選單
 contentI.addEventListener("touchend", e => {
-  const selectedCells = getSelectedDataCells();
+  if (!mobileStartCell) return;
 
-  let lastCell = null;
+  const selectedCells = getSelectedDataCells();
   if (selectedCells.length) {
-    lastCell = selectedCells.reduce((acc, cell) => {
+    // 以矩形右下角格子作為菜單位置
+    const lastCell = selectedCells.reduce((acc, cell) => {
       const r = cell.parentElement.rowIndex;
       const c = cell.cellIndex;
       if (!acc || r > acc.row || (r === acc.row && c > acc.col)) {
         return { cell, row: r, col: c };
       }
       return acc;
-    }, null)?.cell;
-  }
+    }, null).cell;
 
-  mobileSelecting = false;
-  mobileStartCell = null;
-  clearTimeout(longPressTimer);
-
-  // 拖曳選取才自動顯示右鍵菜單
-  if (mobileHasMoved && lastCell) {
+    // 顯示右鍵選單
     handleTableContextMenu({
-      ...e,
       clientX: e.changedTouches[0].clientX,
       clientY: e.changedTouches[0].clientY
     }, lastCell);
   }
 
-  cancelLongPress?.();
+  mobileSelecting = false;
+  mobileStartCell = null;
+  mobileHasMoved = false;
 });
 
 // ===== 手機 touchcancel（中斷時清理狀態） =====
