@@ -1471,6 +1471,8 @@ function cancelLongPress() {
 // =========================== 手機拖曳選取邏輯 =================================================================================
 
 
+// =========================== 手機拖曳選取邏輯 =================================================================================
+
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1483,12 +1485,10 @@ function buildCellMatrix() {
   cellMatrix = [];
   rows.forEach((tr, rowIdx) => {
     const cells = Array.from(tr.cells);
-    let matrixRow = [];
     let colIdx = 0;
     cells.forEach(td => {
       const rowSpan = td.rowSpan || 1;
       const colSpan = td.colSpan || 1;
-      // 填充矩陣
       for (let r = 0; r < rowSpan; r++) {
         while (!cellMatrix[rowIdx + r]) cellMatrix[rowIdx + r] = [];
         for (let c = 0; c < colSpan; c++) {
@@ -1500,13 +1500,10 @@ function buildCellMatrix() {
   });
 }
 
-
-
 // ===== 清除所有選取 =====
 function clearCellSelection() {
   contentI.querySelectorAll("td.selected").forEach(td => td.classList.remove("selected"));
 }
-
 
 // ===== 選取矩形範圍 =====
 function selectRect(startCell, endCell) {
@@ -1530,7 +1527,6 @@ function selectRect(startCell, endCell) {
   }
 }
 
-
 // ===== 找到 td 在矩陣的位置 =====
 function findCellPosition(td) {
   for (let r = 0; r < cellMatrix.length; r++) {
@@ -1541,7 +1537,6 @@ function findCellPosition(td) {
   return null;
 }
 
-
 // ===== 顯示右鍵選單 =====
 function showContextMenu(cell) {
   if (!cell) return;
@@ -1551,13 +1546,12 @@ function showContextMenu(cell) {
   }, cell);
 }
 
-
-// ===== touchstart =====
-contentI.addEventListener("touchstart", e => {
+// ================== 手機觸控事件處理 ===================
+function handleTouchStart(e) {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
-
   e.preventDefault();
+
   mobileSelecting = true;
   mobileHasMoved = false;
   mobileStartCell = td;
@@ -1565,15 +1559,11 @@ contentI.addEventListener("touchstart", e => {
   td.classList.add("selected");
 
   longPressTimer = setTimeout(() => {
-    if (!mobileHasMoved && mobileStartCell) {
-      showContextMenu(mobileStartCell);
-    }
+    if (!mobileHasMoved && mobileStartCell) showContextMenu(mobileStartCell);
   }, 500);
-}, { passive: false });
+}
 
-
-// ===== touchmove =====
-contentI.addEventListener("touchmove", e => {
+function handleTouchMove(e) {
   if (!mobileSelecting) return;
   e.preventDefault();
 
@@ -1583,19 +1573,15 @@ contentI.addEventListener("touchmove", e => {
 
   mobileHasMoved = true;
   selectRect(mobileStartCell, td);
-
   clearTimeout(longPressTimer);
-}, { passive: false });
+}
 
-
-// ===== touchend =====
-contentI.addEventListener("touchend", e => {
+function handleTouchEnd(e) {
   clearTimeout(longPressTimer);
   if (!mobileStartCell) return;
 
   const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
   if (mobileHasMoved && selectedCells.length) {
-    // 右下角格子作為右鍵參考
     let lastCell = selectedCells.reduce((acc, cell) => {
       let pos = findCellPosition(cell);
       if (!pos) return acc;
@@ -1604,26 +1590,35 @@ contentI.addEventListener("touchend", e => {
       }
       return acc;
     }, null).cell;
-
     showContextMenu(lastCell);
   }
 
   mobileSelecting = false;
   mobileStartCell = null;
   mobileHasMoved = false;
-}, { passive: false });
+}
 
-
-// ===== touchcancel =====
-contentI.addEventListener("touchcancel", () => {
+function handleTouchCancel(e) {
   clearTimeout(longPressTimer);
   mobileSelecting = false;
   mobileStartCell = null;
   mobileHasMoved = false;
-});
+}
 
+// ===== 綁定觸控事件到 td =====
+function bindMobileTouchEvents(td) {
+  td.addEventListener("touchstart", handleTouchStart, { passive: false });
+  td.addEventListener("touchmove", handleTouchMove, { passive: false });
+  td.addEventListener("touchend", handleTouchEnd, { passive: false });
+  td.addEventListener("touchcancel", handleTouchCancel);
+}
 
-// ===== 合併格子 =====
+// ===== 初始化綁定 =====
+function initMobileTouch() {
+  contentI.querySelectorAll("td.data-cell").forEach(td => bindMobileTouchEvents(td));
+}
+
+// ================== 合併格子 ===================
 function mergeSelectedCells() {
   buildCellMatrix();
   const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
@@ -1655,10 +1650,10 @@ function mergeSelectedCells() {
   clearCellSelection();
   topLeftCell.classList.add("selected");
   buildCellMatrix();
+  initMobileTouch(); // ✅ 綁定事件到剩下的 td
 }
 
-
-// ===== 拆分格子 =====
+// ================== 拆分格子 ===================
 function splitCell(td) {
   buildCellMatrix();
   const pos = findCellPosition(td);
@@ -1671,17 +1666,22 @@ function splitCell(td) {
 
   const tr = td.parentElement;
   for (let r = 0; r < rowSpan; r++) {
+    let targetRow = tr.parentElement.rows[pos.row + r];
     for (let c = 0; c < colSpan; c++) {
       if (r === 0 && c === 0) continue; // 保留原 td
-      let targetRow = tr.parentElement.rows[pos.row + r];
-      let newTd = document.createElement("td");
+      const newTd = document.createElement("td");
       newTd.className = "data-cell";
-      newTd.textContent = ""; // 可保留原本資料
+      newTd.textContent = "";
       targetRow.insertBefore(newTd, targetRow.cells[pos.col + c] || null);
+      bindMobileTouchEvents(newTd); // ✅ 新 td 綁定觸控事件
     }
   }
   buildCellMatrix();
 }
+
+// ===== 初始化 =====
+initMobileTouch();
+
 
 
 
