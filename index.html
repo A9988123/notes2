@@ -1480,8 +1480,6 @@ contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  e.preventDefault();
-
   mobileSelecting = true;
   mobileHasMoved = false;
   mobileStartCell = td;
@@ -1491,13 +1489,12 @@ contentI.addEventListener("touchstart", e => {
 
   // 長按 500ms 顯示右鍵
   longPressTimer = setTimeout(() => {
-    if (!mobileHasMoved && mobileStartCell) {
+    if (mobileSelecting && !mobileHasMoved && mobileStartCell) {
+      const rect = mobileStartCell.getBoundingClientRect();
       handleTableContextMenu({
-        touches: [{ 
-          clientX: mobileStartCell.getBoundingClientRect().left + mobileStartCell.offsetWidth/2, 
-          clientY: mobileStartCell.getBoundingClientRect().top + mobileStartCell.offsetHeight/2 
-        }]
+        touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }]
       }, mobileStartCell);
+      mobileSelecting = false; // 已觸發右鍵，取消選取狀態
     }
   }, 500);
 }, { passive: false });
@@ -1505,7 +1502,6 @@ contentI.addEventListener("touchstart", e => {
 // ===== touchmove =====
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
-  e.preventDefault();
 
   const touch = e.touches[0];
   const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest("td.data-cell");
@@ -1527,7 +1523,7 @@ contentI.addEventListener("touchend", e => {
 
   const selectedCells = getSelectedDataCells();
   if (selectedCells.length) {
-    // 拖曳或單格選取後，取右下角格子作為右鍵位置
+    // 拖曳後，取右下角格子作為右鍵位置
     const lastCell = selectedCells.reduce((acc, cell) => {
       const r = cell.parentElement.rowIndex;
       const c = cell.cellIndex;
