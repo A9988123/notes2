@@ -1476,6 +1476,25 @@ let mobileStartCell = null;
 let mobileHasMoved = false;
 let longPressTimer = null;
 
+
+// ===================== 統一顯示右鍵函數 =========================
+function showContextMenu(cell) {
+  if (!cell) return;
+  const rect = cell.getBoundingClientRect();
+
+  const fakeEvent = {
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    touches: [{ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }],
+    target: cell,
+    type: "touch",
+    preventDefault: () => {},
+    stopPropagation: () => {}
+  };
+
+  handleTableContextMenu(fakeEvent, cell);
+}
+
 // ===== touchstart =====
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
@@ -1490,12 +1509,9 @@ contentI.addEventListener("touchstart", e => {
   clearCellSelection();
   td.classList.add("selected");
 
-  // 長按 500ms 顯示右鍵
   longPressTimer = setTimeout(() => {
     if (!mobileHasMoved && mobileStartCell) {
       showContextMenu(mobileStartCell);
-      mobileSelecting = false;
-      mobileStartCell = null;
     }
   }, 500);
 }, { passive: false });
@@ -1524,30 +1540,19 @@ contentI.addEventListener("touchend", e => {
 
   const selectedCells = getSelectedDataCells();
   if (selectedCells.length) {
-    let targetCell;
-
-    if (mobileHasMoved) {
-      // 拖曳選取 → 取右下角格子
-      targetCell = selectedCells.reduce((acc, cell) => {
-        const r = cell.parentElement.rowIndex;
-        const c = cell.cellIndex;
-        if (!acc || r > acc.row || (r === acc.row && c > acc.col)) {
-          return { cell, row: r, col: c };
-        }
-        return acc;
-      }, null).cell;
-    } else {
-      // 單格長按 → 取起始格子
-      targetCell = mobileStartCell;
-    }
-
-    showContextMenu(targetCell);
+    // 拖曳多選或單格長按放手後，都顯示右鍵
+    const lastCell = selectedCells[selectedCells.length - 1];
+    showContextMenu(lastCell);
   }
 
   mobileSelecting = false;
   mobileStartCell = null;
   mobileHasMoved = false;
 });
+
+
+
+
 
 // ===== touchcancel =====
 contentI.addEventListener("touchcancel", () => {
@@ -1556,27 +1561,6 @@ contentI.addEventListener("touchcancel", () => {
   mobileStartCell = null;
   mobileHasMoved = false;
 });
-
-// ===== 統一顯示右鍵函數 =====
-function showContextMenu(cell) {
-  if (!cell) return;
-  const rect = cell.getBoundingClientRect();
-
-  // 模擬一個事件物件，保證 handleTableContextMenu 不會報錯
-  const fakeEvent = {
-    clientX: rect.left + rect.width / 2,
-    clientY: rect.top + rect.height / 2,
-    target: cell,
-    type: "touch",
-    preventDefault: () => {},
-    stopPropagation: () => {}
-  };
-
-  handleTableContextMenu(fakeEvent, cell);
-}
-sss
-
-
 
 
 
