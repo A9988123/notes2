@@ -1445,8 +1445,6 @@ contentI.addEventListener("focus", () => {
 // ===== 新增「長按偵測」 (只給手機用)=====
 // ===== 加在JS全域 (只要一次)=====
 
-let longPressTimer = null;
-const LONG_PRESS_TIME = 500; // ms
 
 
 function startLongPress(e, td) {
@@ -1470,8 +1468,9 @@ function cancelLongPress() {
 
 
 
+// =========================== 手機拖曳選取邏輯 =================================================================================
 
-// ===== 📱 Mobile drag select =====
+
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
@@ -1494,13 +1493,8 @@ contentI.addEventListener("touchstart", e => {
   // 長按 500ms 顯示右鍵
   longPressTimer = setTimeout(() => {
     if (!mobileHasMoved && mobileStartCell) {
-      handleTableContextMenu({
-        touches: [{ 
-          clientX: td.getBoundingClientRect().left + td.offsetWidth/2, 
-          clientY: td.getBoundingClientRect().top + td.offsetHeight/2 
-        }]
-      }, mobileStartCell);
-      mobileSelecting = false;   // 已觸發右鍵，取消拖曳選取狀態
+      showContextMenu(mobileStartCell);
+      mobileSelecting = false;
       mobileStartCell = null;
     }
   }, 500);
@@ -1519,7 +1513,6 @@ contentI.addEventListener("touchmove", e => {
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
-  // 拖曳後取消長按
   clearTimeout(longPressTimer);
 }, { passive: false });
 
@@ -1530,8 +1523,6 @@ contentI.addEventListener("touchend", e => {
   if (!mobileStartCell) return;
 
   const selectedCells = getSelectedDataCells();
-
-  // 拖曳後或單格長按後觸發右鍵
   if (selectedCells.length) {
     let targetCell;
 
@@ -1550,13 +1541,7 @@ contentI.addEventListener("touchend", e => {
       targetCell = mobileStartCell;
     }
 
-    // 彈出右鍵選單
-    handleTableContextMenu({
-      touches: [{ 
-        clientX: targetCell.getBoundingClientRect().left + targetCell.offsetWidth/2, 
-        clientY: targetCell.getBoundingClientRect().top + targetCell.offsetHeight/2 
-      }]
-    }, targetCell);
+    showContextMenu(targetCell);
   }
 
   mobileSelecting = false;
@@ -1572,7 +1557,92 @@ contentI.addEventListener("touchcancel", () => {
   mobileHasMoved = false;
 });
 
+// ===== 統一顯示右鍵函數 =====
+function showContextMenu(cell) {
+  if (!cell) return;
+  const rect = cell.getBoundingClientRect();
+  handleTableContextMenu({
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2
+  }, cell);
+}
+
+
+
+
+
+
+
+// =============================================================================================================================== 
+
+
+
+// ===== 把「右鍵邏輯」抽成共用function=====
+// =====新增這個function (桌機/手機共用)=====
+
+function handleTableContextMenu(e, td) {
+  e.preventDefault();
+
+  activeTable = td.closest("table");
+  activeMedia = null;
+
+  const selected = getSelectedDataCells();
+
+  // 沒有 selection 才選取這一格
+  if (selected.length === 0) {
+    clearCellSelection();
+    td.classList.add("selected");
+    anchorCell = td;
+  }
+
+  activeCell = getSelectedDataCells()[0] || td;
+
+  const menu = document.getElementById("tableMenu");
+
+  const x = e.touches ? e.touches[0].clientX : e.clientX;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+  menu.style.display = "block";
+
+  document.getElementById("mediaMenu").style.display = "none";
+}
+
+// ===== 桌機的contextmenu 改成「呼叫共函式」=====
+// =====更新你的contextmenu (重點)=====
+
+contentI.addEventListener("contextmenu", e => {
+  const td = e.target.closest("td.data-cell");
+  const media = e.target.closest("img, video");
+
+  if (td) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleTableContextMenu(e, td);
+    return;
+  }
+
+  if (media) {
+    e.preventDefault();
+    activeMedia = media;
+    activeCell = null;
+    activeTable = null;
+
+    const menu = document.getElementById("mediaMenu");
+    menu.style.left = e.clientX + "px";
+    menu.style.top = e.clientY + "px";
+    menu.style.display = "block";
+
+    document.getElementById("tableMenu").style.display = "none";
+  }
+});
+
+
 //==========================================================================================
+
+
+
 
 
 
