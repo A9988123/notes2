@@ -1469,20 +1469,20 @@ function cancelLongPress() {
 
 
 
-// ===== 在content1加入touch支援=====
-// ===== touchstart:開始長按計時=====
+
 
 // ===== 📱 Mobile drag select =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
+let longPressTimer = null;
 
-
+// ===== touchstart =====
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  e.preventDefault(); // 🔥 很重要（iOS）
+  e.preventDefault();
 
   mobileSelecting = true;
   mobileHasMoved = false;
@@ -1491,127 +1491,88 @@ contentI.addEventListener("touchstart", e => {
   clearCellSelection();
   td.classList.add("selected");
 
-  anchorCell = td;
-  activeCell = td;
+  // 長按 500ms 顯示右鍵
+  longPressTimer = setTimeout(() => {
+    if (!mobileHasMoved && mobileStartCell) {
+      handleTableContextMenu({
+        touches: [{ 
+          clientX: td.getBoundingClientRect().left + td.offsetWidth/2, 
+          clientY: td.getBoundingClientRect().top + td.offsetHeight/2 
+        }]
+      }, mobileStartCell);
+      mobileSelecting = false;   // 已觸發右鍵，取消拖曳選取狀態
+      mobileStartCell = null;
+    }
+  }, 500);
 }, { passive: false });
 
-
+// ===== touchmove =====
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
-
-  e.preventDefault(); // 🔥 一定要有
+  e.preventDefault();
 
   const touch = e.touches[0];
-  const td = getCellFromTouch(touch);
+  const td = document.elementFromPoint(touch.clientX, touch.clientY)?.closest("td.data-cell");
   if (!td) return;
 
   mobileHasMoved = true;
-
   clearCellSelection();
   selectRect(mobileStartCell, td);
+
+  // 拖曳後取消長按
+  clearTimeout(longPressTimer);
 }, { passive: false });
 
-
-contentI.addEventListener("touchend", () => {
-  mobileSelecting = false;
-  mobileStartCell = null;
-});
-
-
-
-
-
-function endMobileSelection() {
-  mobileSelecting = false;
-  mobileStartCell = null;
-}
-
-contentI.addEventListener("touchend", endMobileSelection);
-contentI.addEventListener("touchcancel", endMobileSelection);
-
-
-//  touchend（分流「拖曳」vs「長按」）
+// ===== touchend =====
 contentI.addEventListener("touchend", e => {
-  if (!mobileSelecting) return;
+  clearTimeout(longPressTimer);
 
-  // ❌ 有拖動 → 不算長按
-  if (mobileHasMoved) {
-    cancelLongPress();
+  if (!mobileStartCell) return;
+
+  const selectedCells = getSelectedDataCells();
+
+  // 拖曳後或單格長按後觸發右鍵
+  if (selectedCells.length) {
+    let targetCell;
+
+    if (mobileHasMoved) {
+      // 拖曳選取 → 取右下角格子
+      targetCell = selectedCells.reduce((acc, cell) => {
+        const r = cell.parentElement.rowIndex;
+        const c = cell.cellIndex;
+        if (!acc || r > acc.row || (r === acc.row && c > acc.col)) {
+          return { cell, row: r, col: c };
+        }
+        return acc;
+      }, null).cell;
+    } else {
+      // 單格長按 → 取起始格子
+      targetCell = mobileStartCell;
+    }
+
+    // 彈出右鍵選單
+    handleTableContextMenu({
+      touches: [{ 
+        clientX: targetCell.getBoundingClientRect().left + targetCell.offsetWidth/2, 
+        clientY: targetCell.getBoundingClientRect().top + targetCell.offsetHeight/2 
+      }]
+    }, targetCell);
   }
 
   mobileSelecting = false;
   mobileStartCell = null;
+  mobileHasMoved = false;
 });
 
-
-
-
-// ===== 把「右鍵邏輯」抽成共用function=====
-// =====新增這個function (桌機/手機共用)=====
-
-function handleTableContextMenu(e, td) {
-  e.preventDefault();
-
-  activeTable = td.closest("table");
-  activeMedia = null;
-
-  const selected = getSelectedDataCells();
-
-  // 沒有 selection 才選取這一格
-  if (selected.length === 0) {
-    clearCellSelection();
-    td.classList.add("selected");
-    anchorCell = td;
-  }
-
-  activeCell = getSelectedDataCells()[0] || td;
-
-  const menu = document.getElementById("tableMenu");
-
-  const x = e.touches ? e.touches[0].clientX : e.clientX;
-  const y = e.touches ? e.touches[0].clientY : e.clientY;
-
-  menu.style.left = x + "px";
-  menu.style.top = y + "px";
-  menu.style.display = "block";
-
-  document.getElementById("mediaMenu").style.display = "none";
-}
-
-// ===== 桌機的contextmenu 改成「呼叫共函式」=====
-// =====更新你的contextmenu (重點)=====
-
-contentI.addEventListener("contextmenu", e => {
-  const td = e.target.closest("td.data-cell");
-  const media = e.target.closest("img, video");
-
-  if (td) {
-    e.preventDefault();
-    e.stopPropagation();
-    handleTableContextMenu(e, td);
-    return;
-  }
-
-  if (media) {
-    e.preventDefault();
-    activeMedia = media;
-    activeCell = null;
-    activeTable = null;
-
-    const menu = document.getElementById("mediaMenu");
-    menu.style.left = e.clientX + "px";
-    menu.style.top = e.clientY + "px";
-    menu.style.display = "block";
-
-    document.getElementById("tableMenu").style.display = "none";
-  }
+// ===== touchcancel =====
+contentI.addEventListener("touchcancel", () => {
+  clearTimeout(longPressTimer);
+  mobileSelecting = false;
+  mobileStartCell = null;
+  mobileHasMoved = false;
 });
-
 
 //==========================================================================================
-
-
-
 
 
 
