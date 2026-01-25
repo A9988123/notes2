@@ -1469,20 +1469,18 @@ function cancelLongPress() {
 
 
 
-// ===== 在content1加入touch支援=====
-// ===== touchstart:開始長按計時=====
 
-// ===== 📱 Mobile drag select =====
+// ===== 手機拖曳選取邏輯 =====
+// ===== 📱 Mobile drag select + 自動顯示右鍵菜單 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
-
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  e.preventDefault(); // 🔥 很重要（iOS）
+  e.preventDefault(); // 🔥 iOS 必須
 
   mobileSelecting = true;
   mobileHasMoved = false;
@@ -1494,7 +1492,6 @@ contentI.addEventListener("touchstart", e => {
   anchorCell = td;
   activeCell = td;
 }, { passive: false });
-
 
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
@@ -1511,45 +1508,34 @@ contentI.addEventListener("touchmove", e => {
   selectRect(mobileStartCell, td);
 }, { passive: false });
 
-
-contentI.addEventListener("touchend", () => {
-  mobileSelecting = false;
-  mobileStartCell = null;
-});
-
-
-
-
-
-function endMobileSelection() {
-  mobileSelecting = false;
-  mobileStartCell = null;
-}
-
-contentI.addEventListener("touchend", endMobileSelection);
-contentI.addEventListener("touchcancel", endMobileSelection);
-
-
 // 手機 touchend（拖曳選取後自動顯示右鍵菜單）
 contentI.addEventListener("touchend", e => {
   if (!mobileSelecting) return;
 
   const td = mobileStartCell;
+
+  // 🔹 結束選取
   mobileSelecting = false;
   mobileStartCell = null;
 
-  // ✅ 拖曳過才觸發
+  // 🔹 拖曳過才觸發右鍵菜單
   if (mobileHasMoved && td) {
     const selectedCells = getSelectedDataCells();
     if (selectedCells.length) {
-      // 選取矩形右下角作為菜單參考
+      // 選取矩形右下角作為菜單位置
       const lastCell = selectedCells[selectedCells.length - 1];
       handleTableContextMenu(e, lastCell);
     }
   }
 
-  // 取消長按判斷
+  // 🔹 取消長按判斷
   cancelLongPress?.();
+});
+
+contentI.addEventListener("touchcancel", () => {
+  // 選取中斷時清理狀態
+  mobileSelecting = false;
+  mobileStartCell = null;
 });
 
 
