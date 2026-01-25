@@ -1407,30 +1407,57 @@ contentI.addEventListener("focus", () => {
 let longPressTimer = null;
 const LONG_PRESS_TIME = 500; // ms
 
+
+function startLongPress(e, td) {
+  cancelLongPress();
+
+  longPressTimer = setTimeout(() => {
+    // ⭐ 只有「沒有拖動」才真的算長按
+    if (!mobileHasMoved) {
+      handleTableContextMenu(e, td);
+    }
+  }, LONG_PRESS_TIME);
+}
+
+function cancelLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}
+
+
+
 // ===== 在content1加入touch支援=====
 // ===== touchstart:開始長按計時=====
 
 // ===== 📱 Mobile drag select =====
 let mobileSelecting = false;
 let mobileStartCell = null;
+let mobileHasMoved = false;
 
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  // ❗ 不干擾長按右鍵
-  if (longPressTimer) return;
-
   mobileSelecting = true;
+  mobileHasMoved = false;
   mobileStartCell = td;
+
+  e.preventDefault(); // ⭐ 阻止畫面滑動
 
   clearCellSelection();
   td.classList.add("selected");
 
   anchorCell = td;
   activeCell = td;
-});
+
+  // ⭐ 啟動長按
+  startLongPress(e, td);
+}, { passive: false });
+
+
 
 
 
@@ -1440,16 +1467,21 @@ contentI.addEventListener("touchstart", e => {
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
+  mobileHasMoved = true;
+  cancelLongPress(); // ⭐ 有移動就不算長按
+
   const touch = e.touches[0];
   const el = document.elementFromPoint(touch.clientX, touch.clientY);
   const td = el?.closest("td.data-cell");
-  if (!td || td === mobileStartCell) return;
+  if (!td) return;
 
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
-  e.preventDefault(); // ⭐ 防止畫面滑動
-});
+  e.preventDefault();
+}, { passive: false });
+
+
 
 
 function endMobileSelection() {
@@ -1461,12 +1493,31 @@ contentI.addEventListener("touchend", endMobileSelection);
 contentI.addEventListener("touchcancel", endMobileSelection);
 
 
+//  touchend（分流「拖曳」vs「長按」）
+contentI.addEventListener("touchend", e => {
+  if (!mobileSelecting) return;
+
+  // ❌ 有拖動 → 不算長按
+  if (mobileHasMoved) {
+    cancelLongPress();
+  }
+
+  mobileSelecting = false;
+  mobileStartCell = null;
+});
+
+
+
 
 // ===== touchend:放開->取消長按=====
 
 contentI.addEventListener("touchend", () => {
-  clearTimeout(longPressTimer);
+  cancelLongPress();
+
+  mobileSelecting = false;
+  mobileStartCell = null;
 });
+
 
 
 // ===== 把「右鍵邏輯」抽成共用function=====
