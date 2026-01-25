@@ -1545,19 +1545,20 @@ function selectRect(cellA, cellB) {
 
 
 contentI.addEventListener("pointerdown", e => {
-  // ⭐ 手機直接跳過，避免和 touchstart 打架
+  // ⭐ 手機直接跳過，避免和 touchstart 重複
   if (e.pointerType === "touch") return;
 
   const td = e.target.closest("td.data-cell");
   if (!td) return;
-  if (e.button === 2) return;
 
   clearCellSelection();
   td.classList.add("selected");
+
   anchorCell = td;
   dragStartCell = td;
   isDragging = true;
 });
+
 
 
 
@@ -1657,6 +1658,8 @@ let selectedCells = new Set();
 // ===== 滑鼠選取（儲存格 / 整表）=====
 contentI.addEventListener("mousedown", e => {
 
+  // ⭐ 手機不處理 mouse 流程
+  if ("ontouchstart" in window) return;
   // ---------- 1️⃣ 整張表格選取 ----------
   const table = e.target.closest(".note-table");
   if (table && !e.target.closest("td")) {
@@ -1910,8 +1913,12 @@ function placeCaretAtEnd(el) {
 
 // 在「點擊 td」時同步 activeCell
 contentI.addEventListener("focusin", e => {
-  const td = e.target.closest("td");
+  // ⭐ 手機不在 focus 時做選取
+  if ("ontouchstart" in window) return;
+
+  const td = e.target.closest("td.data-cell");
   if (!td) return;
+
   activeCell = td;
   activeTable = td.closest("table");
 });
