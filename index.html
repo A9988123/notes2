@@ -384,6 +384,11 @@ td.row-header:hover {
   margin-left: 6px;
 }
 
+#noteList {
+  touch-action: none;          /* ⭐ 阻止手勢滑動 */
+  overscroll-behavior: contain;
+}
+
 
 
 </style>
@@ -1445,17 +1450,15 @@ contentI.addEventListener("touchstart", e => {
   mobileHasMoved = false;
   mobileStartCell = td;
 
-  e.preventDefault(); // ⭐ 阻止畫面滑動
-
   clearCellSelection();
   td.classList.add("selected");
 
   anchorCell = td;
   activeCell = td;
 
-  // ⭐ 啟動長按
+  // ⭐ 啟動長按（但先不要 preventDefault）
   startLongPress(e, td);
-}, { passive: false });
+});
 
 
 
@@ -1468,18 +1471,19 @@ contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
   mobileHasMoved = true;
-  cancelLongPress(); // ⭐ 有移動就不算長按
+  cancelLongPress();
 
   const touch = e.touches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  const td = el?.closest("td.data-cell");
+  const td = getCellFromTouch(touch);
   if (!td) return;
 
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
+  // ⭐ 只有真的拖動，才阻止畫面
   e.preventDefault();
 }, { passive: false });
+
 
 
 
