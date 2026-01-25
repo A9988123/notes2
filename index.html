@@ -20,12 +20,6 @@
   -webkit-touch-callout: none; /* 關掉長按浮層 */
 }
 
-/* 表格內儲存格 */
-.note-table td.data-cell {
-  -webkit-user-select: text;
-  user-select: text;
-  touch-action: manipulation;
-}
 
 
 /* 禁止 body / html 的滾動*/
@@ -173,14 +167,25 @@ header {
 }
 
 
+
+/* 🔥 手機 Excel 拖曳選取的關鍵 */
+.note-table {
+  touch-action: none;                 /* 關掉瀏覽器原生手勢 */
+}
+
+/* 預設：所有 td 都不可被瀏覽器選取 */
 .note-table td {
   user-select: none;
+  -webkit-user-select: none;
 }
 
+/* ✅ 真正資料格：允許輸入文字 */
 .note-table td.data-cell {
-  user-select: text;
+  user-select: text;                  /* 桌機 / 已選定後可編輯 */
+  -webkit-user-select: text;
 }
 
+/* 行列標頭維持原樣 */
 .note-table .col-header,
 .note-table .row-header {
   background: #f2f2f2;
@@ -189,9 +194,11 @@ header {
   text-align: center;
 }
 
+/* 選取高亮 */
 .note-table td.selected {
   background: #cce5ff;
 }
+
 
 
 .col-resizer {
@@ -1150,7 +1157,10 @@ function saveSelection() {
 /* =========新增「用 touch 座標找 td」的工具函式========= */
 
 function getCellFromTouch(touch) {
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const el = document.elementFromPoint(
+    touch.clientX,
+    touch.clientY
+  );
   if (!el) return null;
   return el.closest("td.data-cell");
 }
@@ -1472,6 +1482,8 @@ contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
+  e.preventDefault(); // 🔥 很重要（iOS）
+
   mobileSelecting = true;
   mobileHasMoved = false;
   mobileStartCell = td;
@@ -1481,35 +1493,29 @@ contentI.addEventListener("touchstart", e => {
 
   anchorCell = td;
   activeCell = td;
+}, { passive: false });
 
-  // ⭐ 啟動長按（但先不要 preventDefault）
-  startLongPress(e, td);
-});
-
-
-
-
-
-// ===== touchmove:手指移動->取消長按(避免誤觸)=====
-//  手機 touchmove（矩形選取）   這是 Excel Lite 的靈魂   
 
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
-  mobileHasMoved = true;
-  cancelLongPress();
+  e.preventDefault(); // 🔥 一定要有
 
   const touch = e.touches[0];
   const td = getCellFromTouch(touch);
   if (!td) return;
 
+  mobileHasMoved = true;
+
   clearCellSelection();
   selectRect(mobileStartCell, td);
-
-  // ⭐ 只有真的拖曳選取時才阻止畫面捲動
-  e.preventDefault();
 }, { passive: false });
 
+
+contentI.addEventListener("touchend", () => {
+  mobileSelecting = false;
+  mobileStartCell = null;
+});
 
 
 
@@ -1537,17 +1543,6 @@ contentI.addEventListener("touchend", e => {
   mobileStartCell = null;
 });
 
-
-
-
-// ===== touchend:放開->取消長按=====
-
-contentI.addEventListener("touchend", () => {
-  cancelLongPress();
-
-  mobileSelecting = false;
-  mobileStartCell = null;
-});
 
 
 
