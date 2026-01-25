@@ -1650,7 +1650,7 @@ function mergeSelectedCells() {
   clearCellSelection();
   topLeftCell.classList.add("selected");
   buildCellMatrix();
-  initMobileTouch(); // ✅ 綁定事件到剩下的 td
+  initMobileTouch(); // ✅ 重新綁定事件
 }
 
 // ================== 拆分格子 ===================
@@ -1668,7 +1668,7 @@ function splitCell(td) {
   for (let r = 0; r < rowSpan; r++) {
     let targetRow = tr.parentElement.rows[pos.row + r];
     for (let c = 0; c < colSpan; c++) {
-      if (r === 0 && c === 0) continue; // 保留原 td
+      if (r === 0 && c === 0) continue;
       const newTd = document.createElement("td");
       newTd.className = "data-cell";
       newTd.textContent = "";
@@ -1679,10 +1679,17 @@ function splitCell(td) {
   buildCellMatrix();
 }
 
+// ================== 儲存表格後自動重綁定 ===================
+function saveTableData() {
+  // 這裡寫你的儲存邏輯
+  // ...
+
+  // 儲存完成後重新綁定手機觸控事件
+  initMobileTouch();
+}
+
 // ===== 初始化 =====
 initMobileTouch();
-
-
 
 
 // =============================================================================================================================== 
