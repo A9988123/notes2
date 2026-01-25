@@ -1443,53 +1443,64 @@ function cancelLongPress() {
 }
 
 
-// ================= 手機 touch 選取 & 長按 ==========================
-// ===== 手機 touch 選取 & 長按 =====
+// ===== 📱 Mobile Excel-like 表格選取（最終穩定版）=====
 let mobileSelecting = false;
 let mobileStartCell = null;
-let mobileHasMoved = false;
 let longPressTimer = null;
+
+let touchStartX = 0;
+let touchStartY = 0;
+const MOVE_THRESHOLD = 6; // ⭐ 超過 6px 才算「真的在拖曳」
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
   mobileSelecting = true;
-  mobileHasMoved = false;
   mobileStartCell = td;
 
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+
+  // ✅【關鍵 1】單點一定要先清空，只亮一格
   clearCellSelection();
   td.classList.add("selected");
 
   anchorCell = td;
   activeCell = td;
 
-  // ⭐ 啟動長按 0.5 秒
+  // ⭐ 長按候選（但還不能確定）
   longPressTimer = setTimeout(() => {
-    handleTableContextMenu(e, td); // 彈出功能選單
+    // ⭐【關鍵 2】只有「完全沒移動」才允許跳選單
+    handleTableContextMenu(e, td);
   }, 500);
 });
 
 contentI.addEventListener("touchmove", e => {
-  if (!mobileSelecting) return;
+  if (!mobileSelecting || !mobileStartCell) return;
 
-  mobileHasMoved = true;
+  const t = e.touches[0];
+  const dx = Math.abs(t.clientX - touchStartX);
+  const dy = Math.abs(t.clientY - touchStartY);
 
-  // ⭐ 拖動 -> 取消長按
-  if (longPressTimer) {
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
+  // ⭐【關鍵 3】一旦真的移動 → 進入拖曳模式
+  if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+    // 取消長按
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+
+    const td = getCellFromTouch(t);
+    if (!td) return;
+
+    // Excel 式矩形選取
+    clearCellSelection();
+    selectRect(mobileStartCell, td);
+
+    e.preventDefault(); // 防止畫面捲動
   }
-
-  const touch = e.touches[0];
-  const td = getCellFromTouch(touch);
-  if (!td) return;
-
-  clearCellSelection();
-  selectRect(mobileStartCell, td);
-
-  // 阻止畫面滾動
-  e.preventDefault();
 }, { passive: false });
 
 function endMobileSelection() {
