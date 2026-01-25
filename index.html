@@ -1422,12 +1422,6 @@ contentI.addEventListener("focus", () => {
 
 
 
-// ========手機版本功能========== 關鍵改法:加入「長按 = 右鍵」======================
-// ===== 新增「長按偵測」 (只給手機用)=====
-// ===== 加在JS全域 (只要一次)=====
-
-let longPressTimer = null;
-const LONG_PRESS_TIME = 500; // ms
 
 
 function startLongPress(e, td) {
@@ -1449,15 +1443,11 @@ function cancelLongPress() {
 }
 
 
-
-// ===== 在content1加入touch支援=====
-// ===== touchstart:開始長按計時=====
-
-// ===== 📱 Mobile drag select =====
+// ===== 手機 touch 選取 & 長按 =====
 let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
-
+let longPressTimer = null;
 
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
@@ -1473,22 +1463,22 @@ contentI.addEventListener("touchstart", e => {
   anchorCell = td;
   activeCell = td;
 
-  // ⭐ 啟動長按（但先不要 preventDefault）
-  startLongPress(e, td);
+  // ⭐ 啟動長按 0.5 秒
+  longPressTimer = setTimeout(() => {
+    handleTableContextMenu(e, td); // 彈出功能選單
+  }, 500);
 });
-
-
-
-
-
-// ===== touchmove:手指移動->取消長按(避免誤觸)=====
-//  手機 touchmove（矩形選取）   這是 Excel Lite 的靈魂   
 
 contentI.addEventListener("touchmove", e => {
   if (!mobileSelecting) return;
 
   mobileHasMoved = true;
-  cancelLongPress();
+
+  // ⭐ 拖動 -> 取消長按
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
 
   const touch = e.touches[0];
   const td = getCellFromTouch(touch);
@@ -1497,21 +1487,32 @@ contentI.addEventListener("touchmove", e => {
   clearCellSelection();
   selectRect(mobileStartCell, td);
 
-  // ⭐ 只有真的拖動，才阻止畫面
+  // 阻止畫面滾動
   e.preventDefault();
 }, { passive: false });
-
-
-
-
 
 function endMobileSelection() {
   mobileSelecting = false;
   mobileStartCell = null;
+
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
 }
 
 contentI.addEventListener("touchend", endMobileSelection);
 contentI.addEventListener("touchcancel", endMobileSelection);
+
+
+
+
+
+
+
+
+
+
 
 
 //  touchend（分流「拖曳」vs「長按」）
