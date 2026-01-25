@@ -1445,8 +1445,6 @@ contentI.addEventListener("focus", () => {
 // ===== 新增「長按偵測」 (只給手機用)=====
 // ===== 加在JS全域 (只要一次)=====
 
-let longPressTimer = null;
-const LONG_PRESS_TIME = 500; // ms
 
 
 function startLongPress(e, td) {
@@ -1478,11 +1476,16 @@ let mobileSelecting = false;
 let mobileStartCell = null;
 let mobileHasMoved = false;
 
+
+ let longPressTimer = null;
+const LONG_PRESS_DURATION = 500; // 毫秒
+
+// 手機 touchstart 監聽（長按判斷 + 拖曳選取）
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
-  e.preventDefault(); // iOS 必須
+  e.preventDefault();
 
   mobileSelecting = true;
   mobileHasMoved = false;
@@ -1493,6 +1496,17 @@ contentI.addEventListener("touchstart", e => {
 
   anchorCell = td;
   activeCell = td;
+
+  // 🔹 啟動長按計時器
+  longPressTimer = setTimeout(() => {
+    if (!mobileHasMoved && td) {
+      handleTableContextMenu({
+        ...e,
+        clientX: e.touches[0].clientX,
+        clientY: e.touches[0].clientY
+      }, td);
+    }
+  }, LONG_PRESS_DURATION);
 }, { passive: false });
 
 contentI.addEventListener("touchmove", e => {
@@ -1508,15 +1522,15 @@ contentI.addEventListener("touchmove", e => {
 
   clearCellSelection();
   selectRect(mobileStartCell, td);
-}, { passive: false });
+
+  // 🔹 拖曳時取消長按
+  clearTimeout(longPressTimer);
+});
 
 contentI.addEventListener("touchend", e => {
-  if (!mobileSelecting) return;
-
   // 🔹 拖曳結束前保留選取格
   const selectedCells = getSelectedDataCells();
 
-  // 🔹 找矩形右下角格子作為右鍵位置
   let lastCell = null;
   if (selectedCells.length) {
     lastCell = selectedCells.reduce((acc, cell) => {
@@ -1529,13 +1543,13 @@ contentI.addEventListener("touchend", e => {
     }, null)?.cell;
   }
 
-  // 🔹 拖曳狀態清除
+  // 🔹 清除拖曳狀態與長按計時器
   mobileSelecting = false;
   mobileStartCell = null;
+  clearTimeout(longPressTimer);
 
   // 🔹 拖曳過才顯示菜單
   if (mobileHasMoved && lastCell) {
-    // ⚠ 注意 touchend 沒有 touches，要用 changedTouches
     handleTableContextMenu({
       ...e,
       clientX: e.changedTouches[0].clientX,
@@ -1543,13 +1557,13 @@ contentI.addEventListener("touchend", e => {
     }, lastCell);
   }
 
-  // 🔹 取消長按判斷
   cancelLongPress?.();
 });
 
 contentI.addEventListener("touchcancel", () => {
   mobileSelecting = false;
   mobileStartCell = null;
+  clearTimeout(longPressTimer);
 });
 
 
