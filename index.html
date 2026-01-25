@@ -1530,18 +1530,28 @@ contentI.addEventListener("touchend", endMobileSelection);
 contentI.addEventListener("touchcancel", endMobileSelection);
 
 
-//  touchend（分流「拖曳」vs「長按」）
+// 手機 touchend（拖曳選取後自動顯示右鍵菜單）
 contentI.addEventListener("touchend", e => {
   if (!mobileSelecting) return;
 
-  // ❌ 有拖動 → 不算長按
-  if (mobileHasMoved) {
-    cancelLongPress();
-  }
-
+  const td = mobileStartCell;
   mobileSelecting = false;
   mobileStartCell = null;
+
+  // ✅ 拖曳過才觸發
+  if (mobileHasMoved && td) {
+    const selectedCells = getSelectedDataCells();
+    if (selectedCells.length) {
+      // 選取矩形右下角作為菜單參考
+      const lastCell = selectedCells[selectedCells.length - 1];
+      handleTableContextMenu(e, lastCell);
+    }
+  }
+
+  // 取消長按判斷
+  cancelLongPress?.();
 });
+
 
 
 
