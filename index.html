@@ -407,18 +407,6 @@ td.row-header:hover {
 }
 
 
-.table-scroll-wrapper {
-  overflow-x: auto;
-  overflow-y: hidden;
-  max-width: 100%;
-  -webkit-overflow-scrolling: touch;
-  touch-action: none; /* ⭐ 阻止手機滑動觸發外層 scroll */
-  -ms-touch-action: none;
-  position: relative;
-}
-
-
-
 
 </style>
 </head>
@@ -1471,40 +1459,49 @@ let mobileStartCell = null;
 let mobileHasMoved = false;
 
 
-
 contentI.addEventListener("touchstart", e => {
   const td = e.target.closest("td.data-cell");
   if (!td) return;
 
+  mobileSelecting = true;
+  mobileHasMoved = false;
+  mobileStartCell = td;
+
   clearCellSelection();
   td.classList.add("selected");
-  dragStartCell = td;
-  isDragging = true;
 
-  // 阻止編輯區上下滑動
-  e.preventDefault();
+  anchorCell = td;
+  activeCell = td;
+
+  // ⭐ 啟動長按（但先不要 preventDefault）
+  startLongPress(e, td);
 });
+
+
+
+
+
+// ===== touchmove:手指移動->取消長按(避免誤觸)=====
+//  手機 touchmove（矩形選取）   這是 Excel Lite 的靈魂   
 
 contentI.addEventListener("touchmove", e => {
-  if (!isDragging) return;
+  if (!mobileSelecting) return;
+
+  mobileHasMoved = true;
+  cancelLongPress();
+
   const touch = e.touches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  const td = el?.closest("td.data-cell");
+  const td = getCellFromTouch(touch);
+  if (!td) return;
 
-  if (!td) {
-    isDragging = false;
-    return;
-  }
-
-  e.preventDefault(); // ⭐ 阻止整個畫面滑動
   clearCellSelection();
-  selectRect(dragStartCell, td);
-});
+  selectRect(mobileStartCell, td);
 
-contentI.addEventListener("touchend", e => {
-  isDragging = false;
-  dragStartCell = null;
-});
+  // ⭐ 只有真的拖動，才阻止畫面
+  e.preventDefault();
+}, { passive: false });
+
+
 
 
 
@@ -1533,6 +1530,14 @@ contentI.addEventListener("touchend", e => {
 
 
 
+// ===== touchend:放開->取消長按=====
+
+contentI.addEventListener("touchend", () => {
+  cancelLongPress();
+
+  mobileSelecting = false;
+  mobileStartCell = null;
+});
 
 
 
