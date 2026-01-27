@@ -1851,7 +1851,7 @@ function clearCellSelection() {
 // 水平合併（同一列）
 function mergeSelectedCells() {
   buildCellMatrix();
-
+alert("mergeSelectedCells called"); // ← 一定要加
   const selectedCells = getSelectedDataCells();
   if (!selectedCells || selectedCells.length < 2) {
     alert("請選取多個儲存格");
