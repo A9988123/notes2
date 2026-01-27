@@ -423,6 +423,9 @@ td.row-header:hover {
 <header style="display:flex;justify-content:space-between;align-items:center;">
   <span>備忘錄</span>
   <button onclick="toggleTopMenu(event)">⋯</button>
+<button id="exportBtn" onclick="exportNotes()">匯出備忘錄</button>
+<button id="updateExportBtn" onclick="exportUpdatedNotes()">匯出更新資料</button>
+
 </header>
 
 <input id="searchBox" placeholder="🔍 搜尋">
@@ -475,6 +478,9 @@ td.row-header:hover {
 <input type="file" id="backupFile" style="display:none" accept=".json">
 
 <input type="file" id="imgPicker" accept="image/*" hidden>
+
+<input type="file" id="importFile" accept=".json" onchange="importNotes(event)">
+
 
 
 <div id="tableMenu" style="
@@ -1633,12 +1639,14 @@ contentI.addEventListener("contextmenu", e => {
 //==========================================================================================
 
 
-// 矩形選取的核心邏輯（同步 selectedCells）
+
+
+
+
+
+//  矩形選取的核心邏輯
 function selectRect(cellA, cellB) {
   const table = cellA.closest("table");
-
-  clearCellSelection();     // 原本就該清
-  selectedCells.clear();    // 🔥 關鍵：同步資料來源
 
   const r1 = cellA.parentElement.rowIndex;
   const c1 = cellA.cellIndex;
@@ -1655,12 +1663,10 @@ function selectRect(cellA, cellB) {
       const cell = table.rows[r]?.cells[c];
       if (cell && cell.classList.contains("data-cell")) {
         cell.classList.add("selected");
-        selectedCells.add(cell); // ✅ 同步給 merge / split 用
       }
     }
   }
 }
-
 
 
 
@@ -1850,49 +1856,52 @@ function clearCellSelection() {
 
 // 水平合併（同一列）
 function mergeSelectedCells() {
-  buildCellMatrix();
-alert("mergeSelectedCells called"); // ← 一定要加
-  const selectedCells = getSelectedDataCells();
-  if (!selectedCells || selectedCells.length < 2) {
+  const cells = getSelectedDataCells();
+  if (cells.length < 2) {
     alert("請選取多個儲存格");
     return;
   }
 
-  let minRow = Infinity, maxRow = -1;
-  let minCol = Infinity, maxCol = -1;
+  const table = cells[0].closest("table");
 
-  selectedCells.forEach(td => {
-    const pos = findCellPosition(td);
-    if (!pos) return;
-    minRow = Math.min(minRow, pos.row);
-    maxRow = Math.max(maxRow, pos.row);
-    minCol = Math.min(minCol, pos.col);
-    maxCol = Math.max(maxCol, pos.col);
-  });
+  // 取得所有 row / col index
+  const rows = cells.map(c => c.parentElement.rowIndex);
+  const cols = cells.map(c => c.cellIndex);
 
-  const rowSpan = maxRow - minRow + 1;
-  const colSpan = maxCol - minCol + 1;
+  const minRow = Math.min(...rows);
+  const maxRow = Math.max(...rows);
+  const minCol = Math.min(...cols);
+  const maxCol = Math.max(...cols);
 
-  const topLeftCell = cellMatrix[minRow][minCol];
-  topLeftCell.rowSpan = rowSpan;
-  topLeftCell.colSpan = colSpan;
-
-  // 🔥 不 remove，只隱藏
+  // 驗證是否為「完整矩形」
   for (let r = minRow; r <= maxRow; r++) {
     for (let c = minCol; c <= maxCol; c++) {
-      const td = cellMatrix[r][c];
-      if (td !== topLeftCell) {
-        td.style.display = "none";
-        td.dataset.merged = "true";
+      const cell = table.rows[r]?.cells[c];
+      if (!cell || !cell.classList.contains("data-cell")) {
+        alert("選取範圍必須是完整矩形");
+        return;
+      }
+      if (!cell.classList.contains("selected")) {
+        alert("選取範圍必須是完整矩形");
+        return;
       }
     }
   }
 
-  clearCellSelection();
-  topLeftCell.classList.add("selected");
-  buildCellMatrix();
-}
+  // 左上角儲存格保留
+  const master = table.rows[minRow].cells[minCol];
+  master.rowSpan = maxRow - minRow + 1;
+  master.colSpan = maxCol - minCol + 1;
 
+  // 移除其他儲存格
+  cells.forEach(cell => {
+    if (cell !== master) {
+      cell.remove();
+    }
+  });
+
+  clearCellSelection();
+}
 
 
 
@@ -2586,6 +2595,82 @@ if (fab) {
       fabLock = false;
     }, 300);
   });
+}
+
+
+// 匯出備忘錄
+function exportNotes() {
+    const notes = getNotesData(); // 假設這個函數會獲取所有備忘錄資料
+    const notesJSON = JSON.stringify(notes);  // 將備忘錄資料轉換為 JSON 字串
+
+    // 創建一個 Blob 來下載 JSON 文件
+    const blob = new Blob([notesJSON], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'notes.json';  // 設定下載檔案名稱
+    link.click();  // 觸發下載
+}
+
+// 假設這是獲取備忘錄資料的函數
+function getNotesData() {
+    // 這裡可以使用本地存儲，API 或其他方式來獲取備忘錄數據
+    // 假設我們從 localStorage 取得備忘錄數據
+    return JSON.parse(localStorage.getItem('notes')) || [];
+}
+
+
+// 匯入備忘錄資料
+function importNotes(event) {
+    const file = event.target.files[0];  // 獲取用戶選擇的檔案
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const notesJSON = e.target.result;  // 讀取到的 JSON 資料
+        try {
+            const notes = JSON.parse(notesJSON);  // 解析 JSON 資料
+            updateNotesList(notes);  // 顯示備忘錄並讓用戶編輯
+        } catch (error) {
+            alert("無法解析備忘錄資料，請確保檔案格式正確。");
+        }
+    };
+
+    reader.readAsText(file);  // 讀取檔案內容
+}
+
+// 顯示備忘錄資料並讓用戶編輯
+function updateNotesList(notes) {
+    const noteListElement = document.getElementById('noteList');
+    noteListElement.innerHTML = '';  // 清空現有的備忘錄列表
+
+    notes.forEach(note => {
+        const noteItem = document.createElement('div');
+        noteItem.classList.add('note-item');
+        noteItem.innerHTML = `<div class="note-main">
+            <div class="note-title">${note.title}</div>
+            <div class="note-sub">${note.content}</div>
+        </div>`;
+        noteListElement.appendChild(noteItem);
+    });
+
+    // 可選：可以根據需要讓用戶編輯這些資料
+}
+
+// 儲存修改過的備忘錄
+function saveNotesToLocalStorage(notes) {
+    localStorage.setItem('notes', JSON.stringify(notes));  // 儲存修改後的備忘錄
+}
+
+
+// 匯出更新後的備忘錄資料
+function exportUpdatedNotes() {
+    const updatedNotes = getNotesData(); // 假設這是更新後的備忘錄資料
+    const notesJSON = JSON.stringify(updatedNotes);  // 將備忘錄資料轉換為 JSON 字串
+
+    const blob = new Blob([notesJSON], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'updated_notes.json';  // 設定下載檔案名稱
+    link.click();  // 觸發下載
 }
 
 
