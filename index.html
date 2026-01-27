@@ -1633,14 +1633,12 @@ contentI.addEventListener("contextmenu", e => {
 //==========================================================================================
 
 
-
-
-
-
-
-//  矩形選取的核心邏輯
+// 矩形選取的核心邏輯（同步 selectedCells）
 function selectRect(cellA, cellB) {
   const table = cellA.closest("table");
+
+  clearCellSelection();     // 原本就該清
+  selectedCells.clear();    // 🔥 關鍵：同步資料來源
 
   const r1 = cellA.parentElement.rowIndex;
   const c1 = cellA.cellIndex;
@@ -1657,10 +1655,12 @@ function selectRect(cellA, cellB) {
       const cell = table.rows[r]?.cells[c];
       if (cell && cell.classList.contains("data-cell")) {
         cell.classList.add("selected");
+        selectedCells.add(cell); // ✅ 同步給 merge / split 用
       }
     }
   }
 }
+
 
 
 
