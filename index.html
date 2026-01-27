@@ -1850,52 +1850,49 @@ function clearCellSelection() {
 
 // 水平合併（同一列）
 function mergeSelectedCells() {
-  const cells = getSelectedDataCells();
-  if (cells.length < 2) {
+  buildCellMatrix();
+
+  const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
+  if (selectedCells.length < 2) {
     alert("請選取多個儲存格");
     return;
   }
 
-  const table = cells[0].closest("table");
+  let minRow = Infinity, maxRow = -1;
+  let minCol = Infinity, maxCol = -1;
 
-  // 取得所有 row / col index
-  const rows = cells.map(c => c.parentElement.rowIndex);
-  const cols = cells.map(c => c.cellIndex);
+  selectedCells.forEach(td => {
+    const pos = findCellPosition(td);
+    if (!pos) return;
+    minRow = Math.min(minRow, pos.row);
+    maxRow = Math.max(maxRow, pos.row);
+    minCol = Math.min(minCol, pos.col);
+    maxCol = Math.max(maxCol, pos.col);
+  });
 
-  const minRow = Math.min(...rows);
-  const maxRow = Math.max(...rows);
-  const minCol = Math.min(...cols);
-  const maxCol = Math.max(...cols);
+  const rowSpan = maxRow - minRow + 1;
+  const colSpan = maxCol - minCol + 1;
 
-  // 驗證是否為「完整矩形」
+  const topLeftCell = cellMatrix[minRow][minCol];
+  topLeftCell.rowSpan = rowSpan;
+  topLeftCell.colSpan = colSpan;
+
+  // 🔥 關鍵：不要 remove
   for (let r = minRow; r <= maxRow; r++) {
     for (let c = minCol; c <= maxCol; c++) {
-      const cell = table.rows[r]?.cells[c];
-      if (!cell || !cell.classList.contains("data-cell")) {
-        alert("選取範圍必須是完整矩形");
-        return;
-      }
-      if (!cell.classList.contains("selected")) {
-        alert("選取範圍必須是完整矩形");
-        return;
+      const td = cellMatrix[r][c];
+      if (td !== topLeftCell) {
+        td.style.display = "none";
+        td.dataset.merged = "true";
       }
     }
   }
 
-  // 左上角儲存格保留
-  const master = table.rows[minRow].cells[minCol];
-  master.rowSpan = maxRow - minRow + 1;
-  master.colSpan = maxCol - minCol + 1;
-
-  // 移除其他儲存格
-  cells.forEach(cell => {
-    if (cell !== master) {
-      cell.remove();
-    }
-  });
-
   clearCellSelection();
+  topLeftCell.classList.add("selected");
+  buildCellMatrix();
 }
+
 
 
 
