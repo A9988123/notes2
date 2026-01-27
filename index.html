@@ -1852,8 +1852,8 @@ function clearCellSelection() {
 function mergeSelectedCells() {
   buildCellMatrix();
 
-  const selectedCells = Array.from(contentI.querySelectorAll("td.selected"));
-  if (selectedCells.length < 2) {
+  const selectedCells = getSelectedDataCells();
+  if (!selectedCells || selectedCells.length < 2) {
     alert("請選取多個儲存格");
     return;
   }
@@ -1877,7 +1877,7 @@ function mergeSelectedCells() {
   topLeftCell.rowSpan = rowSpan;
   topLeftCell.colSpan = colSpan;
 
-  // 🔥 關鍵：不要 remove
+  // 🔥 不 remove，只隱藏
   for (let r = minRow; r <= maxRow; r++) {
     for (let c = minCol; c <= maxCol; c++) {
       const td = cellMatrix[r][c];
