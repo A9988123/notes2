@@ -83,7 +83,7 @@ header{
 <header id="topBar">
   <span>備忘錄</span>
   <div>
-    <button onclick="exportNotes()">匯出</button>
+    <button onclick="exportSecure()">加密匯出</button>
     <button onclick="backupFile.click()">匯入</button>
   </div>
 </header>
@@ -101,6 +101,10 @@ header{
 </div>
 
 <input type="file" id="backupFile" accept=".json" hidden />
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<link rel="manifest" href="manifest.json">
 
 <script>
 /* ================= IndexedDB ================= */
@@ -212,7 +216,7 @@ function newNote(){
   openEditor(null);
 }
 
-/* ================= Export ================= */
+/* ================= Export 沒有加密的直接匯出================= */
 
 async function exportNotes(){
   const notes = await getAll();
@@ -225,6 +229,83 @@ async function exportNotes(){
   a.download = "notes_backup.json";
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* ================= Export 「會跳密碼」的匯出================= */
+
+async function exportSecure() {
+  const password = prompt("請輸入加密密碼（請務必記住）");
+  if (!password) return;
+
+  const zipBlob = await buildZipBlob(); // 先產生 ZIP
+  const encryptedBlob = await encryptBlob(zipBlob, password);
+
+  // 👉 加密後再進入「分享 / 下載」
+  await shareOrDownload(
+    encryptedBlob,
+    "notes.secure",
+    "application/octet-stream"
+  );
+}
+
+/* =================「會出現LocalSend」 關鍵函式 ================= */
+
+async function shareOrDownload(blob, filename, type) {
+  const file = new File([blob], filename, { type });
+
+  if (
+    navigator.canShare &&
+    navigator.canShare({ files: [file] })
+  ) {
+    // 👉 手機會跳「分享面板」
+    await navigator.share({
+      files: [file],
+      title: "備忘錄匯出"
+    });
+  } else {
+    // 👉 桌機 / 不支援就下載
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+}
+
+/* ================= ZIP 產生(從你現有資料) ================= */
+
+async function buildZipBlob() {
+  const zip = new JSZip();
+  const notes = await getAll();
+
+  let html = `
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>備忘錄</title></head><body>
+`;
+
+  for (const n of notes) {
+    const div = document.createElement("div");
+    div.innerHTML = n.content;
+
+    for (const media of div.querySelectorAll("img,video")) {
+      if (!media.src.startsWith("data:")) continue;
+
+      const res = await fetch(media.src);
+      const blob = await res.blob();
+      const ext = blob.type.split("/")[1];
+      const name = `media/${crypto.randomUUID()}.${ext}`;
+
+      zip.file(name, blob);
+      media.src = name;
+    }
+
+    html += `<h2>${n.title}</h2>${div.innerHTML}<hr>`;
+  }
+
+  html += "</body></html>";
+  zip.file("index.html", html);
+
+  return zip.generateAsync({ type: "blob" });
 }
 
 /* ================= Import ================= */
@@ -251,6 +332,154 @@ backupFile.onchange = e=>{
   };
   reader.readAsText(file);
 };
+
+/* ================= ZIP 匯出函式 ================= */
+
+async function exportZip() {
+  const zip = new JSZip();
+  const notes = await getAll();
+
+  let html = `
+<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<title>備忘錄匯出</title>
+<style>
+body{font-family:system-ui;padding:20px;}
+.note{margin-bottom:40px;}
+</style>
+</head><body>
+`;
+
+  for (const n of notes) {
+    let content = n.content;
+
+    // 抽取圖片 / 影片
+    const div = document.createElement("div");
+    div.innerHTML = content;
+
+    for (const media of div.querySelectorAll("img,video")) {
+      const src = media.src;
+      if (!src.startsWith("data:")) continue;
+
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const ext = blob.type.split("/")[1];
+      const name = `media/${crypto.randomUUID()}.${ext}`;
+
+      zip.file(name, blob);
+      media.src = name;
+    }
+
+    html += `
+<div class="note">
+  <h2>${n.title}</h2>
+  ${div.innerHTML}
+</div>`;
+  }
+
+  html += "</body></html>";
+  zip.file("index.html", html);
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(blob, "notes.zip");
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+/* ================= 加密 ZIP 匯出 ================= */
+
+async function encryptAndExport(password) {
+  const zipBlob = await (await fetchZipBlob()).blob();
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    await zipBlob.arrayBuffer()
+  );
+
+  const out = new Blob([salt, iv, new Uint8Array(encrypted)]);
+  downloadBlob(out, "notes.secure");
+}
+
+/* ================= 真正有用的 AES 加密 (WebCrypto) ================= */
+
+async function encryptBlob(blob, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    await blob.arrayBuffer()
+  );
+
+  return new Blob([salt, iv, new Uint8Array(encrypted)], {
+    type: "application/octet-stream"
+  });
+}
+
+/* ================= 最佳實務 (已被大量PWA 使用) LocalSend ================= */
+
+async function shareZip() {
+  const blob = await exportZipBlob();
+
+  if (navigator.canShare && navigator.canShare({ files: [blob] })) {
+    await navigator.share({
+      files: [new File([blob], "notes.zip")],
+      title: "備忘錄匯出"
+    });
+  } else {
+    downloadBlob(blob, "notes.zip");
+    alert("請使用 LocalSend 選取此檔案");
+  }
+}
+
+
+/* ================= PWA ================= */
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
 
 /* ================= Init ================= */
 
