@@ -107,7 +107,6 @@ header{
 
 <script>
 /* ================= IndexedDB ================= */
-
 const DB_NAME = "memoDB";
 const STORE = "notes";
 let db = null;
@@ -116,19 +115,16 @@ let currentId = null;
 function openDB(){
   return new Promise((resolve,reject)=>{
     const req = indexedDB.open(DB_NAME,1);
-
     req.onupgradeneeded = e=>{
       const _db = e.target.result;
       if(!_db.objectStoreNames.contains(STORE)){
         _db.createObjectStore(STORE,{ keyPath:"id" });
       }
     };
-
     req.onsuccess = e=>{
       db = e.target.result;
       resolve();
     };
-
     req.onerror = e=>reject(e);
   });
 }
@@ -152,13 +148,10 @@ function remove(id){
 }
 
 /* ================= List ================= */
-
 async function refresh(){
   const list = document.getElementById("noteList");
   list.innerHTML = "";
-
   const notes = await getAll();
-
   notes
     .sort((a,b)=>b.timestamp-a.timestamp)
     .forEach(n=>{
@@ -174,14 +167,11 @@ async function refresh(){
 }
 
 /* ================= Editor ================= */
-
 async function openEditor(id){
   currentId = id;
   const notes = await getAll();
   const note = notes.find(n=>n.id===id);
-
   content.innerHTML = note?.content || "";
-
   editor.style.display = "flex";
   noteList.style.display = "none";
   fab.style.display = "none";
@@ -197,7 +187,6 @@ function closeEditor(){
 
 function saveEditor(){
   const text = content.innerText.trim();
-
   save({
     id: currentId || Date.now().toString(),
     title: text.slice(0,20),
@@ -205,7 +194,6 @@ function saveEditor(){
     encrypted:false,
     timestamp: Date.now()
   });
-
   closeEditor();
 }
 
@@ -215,139 +203,10 @@ function newNote(){
   openEditor(null);
 }
 
-/* ================= Export 沒有加密的直接匯出================= */
-
-async function exportNotes(){
-  const notes = await getAll();
-  const blob = new Blob(
-    [JSON.stringify(notes,null,2)],
-    {type:"application/json"}
-  );
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "notes_backup.json";
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-/* ================= 匯出完成一定要「有結果」 ================= */
-
-async function exportSecure() {
-  try {
-    const password = prompt("請輸入加密密碼");
-    if (!password) return;
-
-    const zipBlob = await buildZipBlob();
-    const encryptedBlob = await encryptBlob(zipBlob, password);
-
-    const file = new File(
-      [encryptedBlob],
-      "notes.secure",
-      { type: "application/octet-stream" }
-    );
-
-    downloadFile(file, file.name);
-
-    alert("✅ 匯出完成（file:// 測試模式）");
-
-  } catch (e) {
-    console.error(e);
-    alert("❌ 匯出失敗，請查看 Console");
-  }
-}
-
-/* ===停用==============「會出現LocalSend」 關鍵函式 ================= 
-
-async function shareOrDownload(blob, filename, type) {
-  const file = new File([blob], filename, { type });
-
-  if (
-    navigator.canShare &&
-    navigator.canShare({ files: [file] })
-  ) {
-    // 👉 手機會跳「分享面板」
-    await navigator.share({
-      files: [file],
-      title: "備忘錄匯出"
-    });
-  } else {
-    // 👉 桌機 / 不支援就下載
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-}
-
-====================================================================*/
-
-
-/* ================= 更換分享 LocalSend ================= */
-
-function downloadFile(blob, name) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-async function shareOrDownload(file) {
-  if (
-    location.protocol !== "file:" &&
-    navigator.canShare &&
-    navigator.canShare({ files: [file] })
-  ) {
-    await navigator.share({ files: [file], title: "備忘錄匯出" });
-  } else {
-    downloadFile(file, file.name);
-    alert("已下載備份檔（file:// 模式無法分享）");
-  }
-}
-
-/* ================= ZIP 產生(從你現有資料) ================= */
-
-async function buildZipBlob() {
-  const zip = new JSZip();
-  const notes = await getAll();
-
-  let html = `
-<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>備忘錄</title></head><body>
-`;
-
-  for (const n of notes) {
-    const div = document.createElement("div");
-    div.innerHTML = n.content;
-
-    for (const media of div.querySelectorAll("img,video")) {
-      if (!media.src.startsWith("data:")) continue;
-
-      const res = await fetch(media.src);
-      const blob = await res.blob();
-      const ext = blob.type.split("/")[1];
-      const name = `media/${crypto.randomUUID()}.${ext}`;
-
-      zip.file(name, blob);
-      media.src = name;
-    }
-
-    html += `<h2>${n.title}</h2>${div.innerHTML}<hr>`;
-  }
-
-  html += "</body></html>";
-  zip.file("index.html", html);
-
-  return zip.generateAsync({ type: "blob" });
-}
-
 /* ================= Import ================= */
-
 backupFile.onchange = e=>{
   const file = e.target.files[0];
   if(!file) return;
-
   const reader = new FileReader();
   reader.onload = async ()=>{
     const data = JSON.parse(reader.result);
@@ -365,74 +224,57 @@ backupFile.onchange = e=>{
     alert("匯入完成");
   };
   reader.readAsText(file);
-};
-
-/* ================= ZIP 匯出函式 ================= */
-
-async function exportZip() {
-  const zip = new JSZip();
-  const notes = await getAll();
-
-  let html = `
-<!DOCTYPE html><html><head>
-<meta charset="utf-8">
-<title>備忘錄匯出</title>
-<style>
-body{font-family:system-ui;padding:20px;}
-.note{margin-bottom:40px;}
-</style>
-</head><body>
-`;
-
-  for (const n of notes) {
-    let content = n.content;
-
-    // 抽取圖片 / 影片
-    const div = document.createElement("div");
-    div.innerHTML = content;
-
-    for (const media of div.querySelectorAll("img,video")) {
-      const src = media.src;
-      if (!src.startsWith("data:")) continue;
-
-      const res = await fetch(src);
-      const blob = await res.blob();
-      const ext = blob.type.split("/")[1];
-      const name = `media/${crypto.randomUUID()}.${ext}`;
-
-      zip.file(name, blob);
-      media.src = name;
-    }
-
-    html += `
-<div class="note">
-  <h2>${n.title}</h2>
-  ${div.innerHTML}
-</div>`;
-  }
-
-  html += "</body></html>";
-  zip.file("index.html", html);
-
-  const blob = await zip.generateAsync({ type: "blob" });
-  downloadBlob(blob, "notes.zip");
 }
 
-function downloadBlob(blob, filename) {
+/* ================= Utilities ================= */
+function downloadBlob(blob, filename){
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 
-/* ================= 加密 ZIP 匯出 ================= */
+function canUseWebCrypto(){
+  return (
+    location.protocol === "https:" ||
+    location.hostname === "localhost"
+  ) && !!window.crypto?.subtle;
+}
 
-async function encryptAndExport(password) {
-  const zipBlob = await (await fetchZipBlob()).blob();
+/* ================= Build ZIP ================= */
+async function buildZipBlob(){
+  const zip = new JSZip();
+  const notes = await getAll();
 
+  let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>備忘錄</title></head><body>`;
+
+  for (const n of notes){
+    const div = document.createElement("div");
+    div.innerHTML = n.content;
+
+    for (const media of div.querySelectorAll("img,video")){
+      if (!media.src.startsWith("data:")) continue;
+      const res = await fetch(media.src);
+      const blob = await res.blob();
+      const ext = blob.type.split("/")[1];
+      const name = `media/${crypto.randomUUID()}.${ext}`;
+      zip.file(name, blob);
+      media.src = name;
+    }
+
+    html += `<h2>${n.title}</h2>${div.innerHTML}<hr>`;
+  }
+
+  html += "</body></html>";
+  zip.file("index.html", html);
+  return zip.generateAsync({ type:"blob" });
+}
+
+/* ================= 加密 ================= */
+async function encryptBlobWebCrypto(blob,password){
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -440,86 +282,72 @@ async function encryptAndExport(password) {
     false,
     ["deriveKey"]
   );
-
   const key = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    { name:"PBKDF2", salt, iterations:100000, hash:"SHA-256" },
     keyMaterial,
-    { name: "AES-GCM", length: 256 },
+    { name:"AES-GCM", length:256 },
     false,
     ["encrypt"]
   );
-
   const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name:"AES-GCM", iv },
     key,
-    await zipBlob.arrayBuffer()
+    await blob.arrayBuffer()
   );
-
-  const out = new Blob([salt, iv, new Uint8Array(encrypted)]);
-  downloadBlob(out, "notes.secure");
+  return new Blob([salt,iv,new Uint8Array(encrypted)],{ type:"application/octet-stream" });
 }
 
-/* ================= 統一加密入否(重點) ================= */
-
-async function encryptBlob(blob, password) {
-  if (canUseWebCrypto()) {
-    console.log("使用 WebCrypto AES");
-    return encryptBlobWebCrypto(blob, password);
-  } else {
-    console.log("使用 fallback AES（file:// 模式）");
-    return encryptBlobFallback(blob, password);
-  }
-}
-
-/* ================= 最佳實務 (已被大量PWA 使用) LocalSend ================= */
-
-async function shareZip() {
-  const blob = await exportZipBlob();
-
-  if (navigator.canShare && navigator.canShare({ files: [blob] })) {
-    await navigator.share({
-      files: [new File([blob], "notes.zip")],
-      title: "備忘錄匯出"
-    });
-  } else {
-    downloadBlob(blob, "notes.zip");
-    alert("請使用 LocalSend 選取此檔案");
-  }
-}
-
-/* ================= 修掉「匯出卡住」的關鍵防困 ================= */
-
-const isFileProtocol = location.protocol === "file:";
-
-if (isFileProtocol) {
-  console.warn("目前為 file://，已自動停用 Service Worker / 分享限制");
-}
-
-/* ================= 確保「file://絕對不會部WebCrypot」 ================= */
-
-function canUseWebCrypto() {
-  return (
-    location.protocol === "https:" ||
-    location.hostname === "localhost"
-  ) && !!window.crypto?.subtle;
-}
-
-/* ================= 確保fallback 一定回傳Blob ================= */
-
-async function encryptBlobFallback(blob, password) {
+async function encryptBlobFallback(blob,password){
   const buf = await blob.arrayBuffer();
   const wordArray = CryptoJS.lib.WordArray.create(buf);
-  const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString();
+  const encrypted = CryptoJS.AES.encrypt(wordArray,password).toString();
+  return new Blob([encrypted],{ type:"application/octet-stream" });
+}
 
-  return new Blob(
-    [encrypted],
-    { type: "application/octet-stream" }
-  );
+async function encryptBlob(blob,password){
+  if(canUseWebCrypto()){
+    return encryptBlobWebCrypto(blob,password);
+  } else {
+    return encryptBlobFallback(blob,password);
+  }
+}
+
+/* ================= Export Secure ================= */
+async function exportSecure(){
+  try {
+    const password = prompt("請輸入加密密碼");
+    if(!password) return;
+
+    const zipBlob = await buildZipBlob();
+    const encryptedBlob = await encryptBlob(zipBlob,password);
+    const file = new File([encryptedBlob],"notes.secure",{ type:"application/octet-stream" });
+
+    // iOS PWA / LocalSend 自動分享
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && !isFileProtocol) {
+      await navigator.share({ files: [file], title: "備忘錄匯出" });
+    } else if (location.protocol !== "file:") {
+      // 直接打開 LocalSend 分享頁面
+      const fileURL = URL.createObjectURL(file);
+      const sendURL = `https://localsend.example.com/send?file=${encodeURIComponent(fileURL)}`;
+      window.location.href = sendURL; // 使用 window.location.href 來直接觸發下載或分享
+    } else {
+      downloadBlob(file, file.name);
+      alert("file:// 模式已下載備份，請透過瀏覽器或 PWA 使用 LocalSend 分享");
+    }
+
+  } catch (e) {
+    console.error(e);
+    alert("❌ 匯出失敗，請查看 Console");
+  }
 }
 
 /* ================= Init ================= */
+const isFileProtocol = location.protocol==="file:";
+if(isFileProtocol){
+  console.warn("目前為 file://，已自動停用 Service Worker / 分享限制");
+}
 
-window.addEventListener("load",async()=>{
+window.addEventListener("load", async () => {
   await openDB();
   refresh();
 });
