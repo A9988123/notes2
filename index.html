@@ -199,31 +199,33 @@
     }
 
     /* ================= exportSecure ================= */
-    async function exportSecure() {
-      const password = prompt("請輸入加密密碼");
-      if (!password) return;
-      try {
-        const zipBlob = await buildZipBlob();
-        const encryptedBlob = await encryptBlob(zipBlob, password);
-        const file = new File([encryptedBlob], "notes.secure.zip", { type: "application/octet-stream" });
-        if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
-          await navigator.share({ files: [file], title: "備忘錄匯出" });
-        } else downloadBlob(file, file.name);
-      } catch (err) {
-        console.error(err);
-        alert("❌ 匯出失敗");
-      }
-    }
+/* ================= exportSecure ================= */
+async function exportSecure() {
+  const password = prompt("請輸入加密密碼");
+  if (!password) return;
+  try {
+    const zipBlob = await buildZipBlob();  // 建立備忘錄 ZIP 檔案
+    const encryptedBlob = await encryptBlob(zipBlob, password);  // 加密 ZIP 檔案
+    const file = new Blob([encryptedBlob], { type: "application/octet-stream" });
+    
+    // 使用 Blob 下載方法，避免 File API 在手機 Safari 下的問題
+    downloadBlob(file, "notes.secure.zip");
+  } catch (err) {
+    console.error("匯出失敗：", err);
+    alert("❌ 匯出失敗。請檢查是否有輸入密碼或其他錯誤。");
+  }
+}
 
-    function downloadBlob(blob, filename) {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    }
+function downloadBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(a.href);  // 清理資源
+  a.remove();
+}
+
 
     /* ================= importSecure ================= */
     async function importSecure(file) {
