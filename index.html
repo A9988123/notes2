@@ -175,12 +175,24 @@
     }
 
     /* ================= CryptoJS 加密/解密 ================= */
-    async function encryptBlob(blob, password) {
-      const arrayBuffer = await blob.arrayBuffer();
-      const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-      const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString();
-      return new Blob([encrypted], { type: "application/octet-stream" });
+/* ================= 加密過程 ================= */
+async function encryptBlob(blob, password) {
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
+    
+    // Step 1: 加密過程
+    const encrypted = CryptoJS.AES.encrypt(wordArray, password);
+    if (!encrypted || !encrypted.toString()) {
+      throw new Error("加密失敗，返回的加密數據為空。");
     }
+
+    return new Blob([encrypted.toString()], { type: "application/octet-stream" });
+  } catch (err) {
+    console.error("加密過程中出現錯誤：", err);
+    throw new Error("加密過程發生錯誤");
+  }
+}
 
     async function decryptBlobCryptoJS(data, password) {
       const text = new TextDecoder().decode(data);
@@ -202,30 +214,44 @@
 /* ================= exportSecure ================= */
 async function exportSecure() {
   const password = prompt("請輸入加密密碼");
-  if (!password) return;
+  if (!password) {
+    alert("❌ 密碼不可為空");
+    return;
+  }
+
   try {
-    const zipBlob = await buildZipBlob();  // 建立備忘錄 ZIP 檔案
-    const encryptedBlob = await encryptBlob(zipBlob, password);  // 加密 ZIP 檔案
+    // Step 1: 生成備忘錄 ZIP 檔案
+    console.log("正在生成備忘錄ZIP檔案...");
+    const zipBlob = await buildZipBlob();  
+    console.log("備忘錄ZIP檔案生成成功。");
+
+    // Step 2: 對 ZIP 檔案進行加密
+    console.log("正在加密備忘錄ZIP檔案...");
+    const encryptedBlob = await encryptBlob(zipBlob, password);
+    console.log("備忘錄ZIP檔案加密成功。");
+
+    // Step 3: 下載加密後的檔案
+    console.log("開始下載加密檔案...");
     const file = new Blob([encryptedBlob], { type: "application/octet-stream" });
-    
-    // 使用 Blob 下載方法，避免 File API 在手機 Safari 下的問題
     downloadBlob(file, "notes.secure.zip");
+    console.log("檔案下載觸發成功。");
+
   } catch (err) {
-    console.error("匯出失敗：", err);
-    alert("❌ 匯出失敗。請檢查是否有輸入密碼或其他錯誤。");
+    console.error("匯出失敗，錯誤細節：", err);
+    alert("❌ 匯出失敗。請檢查密碼是否正確或其他錯誤。");
   }
 }
 
+/* ================= 下載文件 ================= */
 function downloadBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);  // 清理資源
+  URL.revokeObjectURL(a.href);
   a.remove();
 }
-
 
     /* ================= importSecure ================= */
     async function importSecure(file) {
