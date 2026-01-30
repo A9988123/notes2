@@ -202,20 +202,17 @@
 async function exportSecure() {
   const password = prompt("請輸入加密密碼");
   if (!password) return;
+
   try {
     // 建立加密檔案
     const zipBlob = await buildZipBlob();
     const encryptedBlob = await encryptBlob(zipBlob, password);
     const file = new File([encryptedBlob], "notes.secure.zip", { type: "application/octet-stream" });
 
-    // 檢查 navigator.share 是否支援
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
-      // 如果支援分享，使用分享 API
-      await navigator.share({ files: [file], title: "備忘錄匯出" });
-    } else {
-      // 如果不支援分享，則下載檔案
-      downloadBlob(file, file.name);
-    }
+    console.log("加密檔案生成成功，開始處理下載...");
+
+    // 嘗試下載檔案（移除 navigator.share）
+    downloadBlob(file, file.name);
   } catch (err) {
     console.error("匯出失敗：", err);
     alert("❌ 匯出失敗：" + err.message);
@@ -232,11 +229,13 @@ function downloadBlob(blob, filename) {
     a.click();
     URL.revokeObjectURL(a.href);
     a.remove();
+    console.log("檔案下載成功");
   } catch (err) {
     console.error("檔案下載失敗：", err);
     alert("❌ 檔案下載失敗：" + err.message);
   }
 }
+
 
 
     /* ================= importSecure ================= */
