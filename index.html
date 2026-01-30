@@ -30,14 +30,6 @@ header {
 }
 .note-title { font-size: 16px; font-weight: 500; }
 .note-sub { font-size: 12px; color: #888; }
-.delete-btn {
-    background: #ff4d4d;
-    color: #fff;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 5px;
-    font-size: 12px;
-}
 #fab {
     position: fixed;
     right: 18px;
@@ -73,7 +65,6 @@ header {
     margin: 10px;
     border-radius: 10px;
     border: 1px solid #ccc;
-    overflow: auto;
 }
 </style>
 </head>
@@ -141,7 +132,7 @@ function removeAll() {
 }
 
 /* ================= ZIP ================= */
-async function buildZip() {
+async function buildZipBlob() {
     const zip = new JSZip();
     const notes = await getAll();
 
@@ -152,28 +143,37 @@ async function buildZip() {
     html += `</body></html>`;
 
     zip.file("index.html", html);
-    return zip.generateAsync({ type: "uint8array" });
+    return zip.generateAsync({ type: "blob" });
 }
 
-/* ================= Crypto (Safari-safe) ================= */
-async function encryptZip(zipData, password) {
-    const wordArray = CryptoJS.lib.WordArray.create(zipData);
-    return CryptoJS.AES.encrypt(wordArray, password).toString(); // Base64
+/* ================= CryptoJS（你指定的版本） ================= */
+async function encryptBlob(blob, password) {
+    const arrayBuffer = await blob.arrayBuffer();
+    const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
+    const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString();
+    return new Blob([encrypted], { type: "text/plain" });
 }
 
-async function decryptZip(base64, password) {
-    const decrypted = CryptoJS.AES.decrypt(base64, password);
-    if (decrypted.sigBytes <= 0) throw "decrypt failed";
+async function decryptBlobCryptoJS(blob, password) {
+    const text = await blob.text();
+    const decrypted = CryptoJS.AES.decrypt(text, password);
+
+    if (!decrypted.sigBytes || decrypted.sigBytes <= 0) {
+        throw new Error("decrypt failed");
+    }
 
     const words = decrypted.words;
     const bytes = new Uint8Array(decrypted.sigBytes);
-    let i = 0;
-    for (let w of words) {
-        for (let b = 3; b >= 0 && i < bytes.length; b--) {
-            bytes[i++] = (w >> (8 * b)) & 0xff;
+    let offset = 0;
+
+    for (let i = 0; i < words.length && offset < bytes.length; i++) {
+        let w = words[i];
+        for (let b = 3; b >= 0 && offset < bytes.length; b--) {
+            bytes[offset++] = (w >> (8 * b)) & 0xff;
         }
     }
-    return bytes;
+
+    return new Blob([bytes], { type: "application/zip" });
 }
 
 /* ================= 匯出 ================= */
@@ -182,16 +182,16 @@ async function exportSecure() {
     if (!pwd) return;
 
     try {
-        const zipData = await buildZip();
-        const encrypted = await encryptZip(zipData, pwd);
-        const blob = new Blob([encrypted], { type: "text/plain" });
+        const zipBlob = await buildZipBlob();
+        const encryptedBlob = await encryptBlob(zipBlob, pwd);
 
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
+        a.href = URL.createObjectURL(encryptedBlob);
         a.download = "notes.secure.txt";
         a.click();
         URL.revokeObjectURL(a.href);
-    } catch {
+    } catch (e) {
+        console.error(e);
         alert("❌ 匯出失敗");
     }
 }
@@ -202,9 +202,8 @@ async function importSecure(file) {
     if (!pwd) return;
 
     try {
-        const base64 = await file.text();
-        const zipData = await decryptZip(base64, pwd);
-        const zip = await JSZip.loadAsync(zipData);
+        const zipBlob = await decryptBlobCryptoJS(file, pwd);
+        const zip = await JSZip.loadAsync(zipBlob);
         const html = await zip.file("index.html").async("text");
 
         const div = document.createElement("div");
@@ -220,7 +219,8 @@ async function importSecure(file) {
         }
         refresh();
         alert("✅ 匯入完成");
-    } catch {
+    } catch (e) {
+        console.error(e);
         alert("❌ 解密失敗（密碼錯誤或檔案損毀）");
     }
 }
@@ -234,10 +234,11 @@ async function refresh() {
     notes.sort((a,b)=>b.timestamp-a.timestamp).forEach(n => {
         const d = document.createElement("div");
         d.className = "note-item";
-        d.innerHTML = `<div>
-            <div class="note-title">${n.title}</div>
-            <div class="note-sub">${new Date(n.timestamp).toLocaleString()}</div>
-        </div>`;
+        d.innerHTML = `
+            <div>
+                <div class="note-title">${n.title}</div>
+                <div class="note-sub">${new Date(n.timestamp).toLocaleString()}</div>
+            </div>`;
         d.onclick = () => openEditor(n.id);
         list.appendChild(d);
     });
@@ -295,5 +296,6 @@ window.onload = async () => {
     backupFile.onchange = () => backupFile.files[0] && importSecure(backupFile.files[0]);
 };
 </script>
+
 </body>
 </html>
