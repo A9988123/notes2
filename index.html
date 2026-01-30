@@ -80,23 +80,28 @@ async function buildZipBlob(){
   return zip.generateAsync({type:"blob"});
 }
 
-/* ================= encryptBlob / decryptBlob ================= */
-async function encryptBlob(blob,password){
-  const reader=new FileReader();
-  return new Promise(res=>{
-    reader.onload=()=>{const wordArray=CryptoJS.lib.WordArray.create(reader.result);const encrypted=CryptoJS.AES.encrypt(wordArray,password).toString();res(new Blob([encrypted],{type:"application/zip"}));};
-    reader.readAsArrayBuffer(blob);
-  });
+/* ================= encryptBlob 改寫 ================= */
+async function encryptBlob(blob, password){
+  const arrayBuffer = await blob.arrayBuffer();
+  const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
+  const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString(); // Base64 字串
+  return new Blob([encrypted], { type: "application/zip" });
 }
 
-async function decryptBlobCryptoJS(data,password){
-  const text=new TextDecoder().decode(data);
-  const decrypted=CryptoJS.AES.decrypt(text,password);
-  if(!decrypted.sigBytes||decrypted.sigBytes<=0)throw new Error("CryptoJS decrypt failed");
-  const words=decrypted.words;const bytes=new Uint8Array(decrypted.sigBytes);
-  let offset=0;
-  for(let i=0;i<words.length&&offset<bytes.length;i++){const w=words[i];for(let b=3;b>=0&&offset<bytes.length;b--){bytes[offset++]=(w>>(8*b))&0xff;}}
-  return new Blob([bytes],{type:"application/zip"});
+/* ================= decryptBlob 改寫 ================= */
+async function decryptBlobCryptoJS(blob, password){
+  const encryptedText = await blob.text(); // 直接讀 Base64 字串
+  const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
+  if(!decrypted.sigBytes || decrypted.sigBytes <= 0) throw new Error("CryptoJS decrypt failed");
+  const bytes = new Uint8Array(decrypted.sigBytes);
+  let offset = 0;
+  for(let i=0; i<decrypted.words.length && offset < bytes.length; i++){
+    const w = decrypted.words[i];
+    for(let b=3; b>=0 && offset < bytes.length; b--){
+      bytes[offset++] = (w >> (8*b)) & 0xff;
+    }
+  }
+  return new Blob([bytes], { type: "application/zip" });
 }
 
 /* ================= exportSecure ================= */
