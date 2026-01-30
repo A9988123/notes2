@@ -19,6 +19,12 @@
   </div>
 </header>
 
+<div id="quickAdd">
+  <input type="text" id="quickInput" placeholder="輸入備忘訊息" style="width:70%;padding:6px;border-radius:5px;border:1px solid #ccc;">
+  <button id="quickAddBtn" style="padding:6px 12px;border-radius:5px;background:#4a90e2;color:#fff;border:none;cursor:pointer;">新增</button>
+</div>
+
+
 <div id="noteList"></div>
 <div id="fab" onclick="newNote()">＋</div>
 
@@ -79,21 +85,47 @@ function base64ToArrayBuffer(base64) {
   return buffer.buffer;
 }
 
-async function encryptBlob(blob, password) {
-  const arrayBuffer = await blob.arrayBuffer();
-  const base64 = arrayBufferToBase64(arrayBuffer);
-  const encrypted = CryptoJS.AES.encrypt(base64, password).toString();
-  return new Blob([encrypted], { type: "application/octet-stream" });
+function encryptBlob(blob, password) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const wordArray = CryptoJS.lib.WordArray.create(reader.result);
+      const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString();
+      resolve(new Blob([encrypted], { type: "application/octet-stream" }));
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(blob);  // 或 readAsBinaryString(blob)
+  });
 }
 
-async function decryptBlob(blob, password) {
-  const encryptedText = await blob.text();
-  const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
-  const base64 = decrypted.toString(CryptoJS.enc.Utf8);
-  if (!base64) throw new Error("解密失敗");
-  const arrayBuffer = base64ToArrayBuffer(base64);
-  return new Blob([arrayBuffer], { type: "application/zip" });
+function decryptBlob(blob, password) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const encryptedText = reader.result;
+        const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
+        const bytes = decrypted.sigBytes;
+        if (!bytes) throw new Error("解密失敗");
+        const wordArray = decrypted;
+        const buffer = new Uint8Array(wordArray.sigBytes);
+        for (let i = 0; i < wordArray.words.length; i++) {
+          const w = wordArray.words[i];
+          buffer[i*4]   = (w >> 24) & 0xff;
+          buffer[i*4+1] = (w >> 16) & 0xff;
+          buffer[i*4+2] = (w >> 8) & 0xff;
+          buffer[i*4+3] = w & 0xff;
+        }
+        resolve(new Blob([buffer], { type: "application/zip" }));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsText(blob);  // 用 readAsText 可保持與加密一致
+  });
 }
+
 
 
 /* ================= exportSecure ================= */
@@ -177,6 +209,37 @@ async function deleteAllNotes(){
   alert("已刪除，可於 10 秒內復原");
 }
 async function undoDeleteAll(){ if(!lastDeletedNotes) return; for(const note of lastDeletedNotes) save(note); lastDeletedNotes=null; undoBtn.style.display="none"; refresh(); alert("已復原"); }
+
+
+
+/* ================= 列表區快速新增 ================= */
+const quickInput = document.getElementById("quickInput");
+const quickAddBtn = document.getElementById("quickAddBtn");
+
+quickAddBtn.addEventListener("click", async () => {
+  const text = quickInput.value.trim();
+  if (!text) return alert("請輸入訊息");
+
+  // 建立新的備忘錄
+  await save({
+    id: Date.now().toString(),
+    title: text.slice(0, 20),
+    content: text, // 快速新增的訊息內容直接就是輸入文字
+    timestamp: Date.now()
+  });
+
+  quickInput.value = "";
+  refresh(); // 刷新列表
+});
+
+// 也可以支援 Enter 鍵快速新增
+quickInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    quickAddBtn.click();
+  }
+});
+
 
 /* ================= 啟動 ================= */
 window.addEventListener("load", async ()=>{
