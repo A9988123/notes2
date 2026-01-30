@@ -111,28 +111,20 @@ async function decryptBlobCryptoJS(data,password){
 
 /* ================= exportSecure ================= */
 
-async function exportSecure(){
-  const password = prompt("請輸入加密密碼");
-  if(!password) return;
+// 匯出
+async function exportSecure() {
+  const password = prompt("請輸入密碼");
+  if (!password) return;
 
-  try{
-    const notes = await getAll();
-    // 將資料轉成 JSON
-    const jsonStr = JSON.stringify(notes);
-    // AES 加密 JSON
-    const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
-    const blob = new Blob([encrypted], {type:"application/octet-stream"});
-    const file = new File([blob], "notes.secure.json", {type:"application/octet-stream"});
+  const notes = await getAll();
+  const jsonStr = JSON.stringify(notes);
 
-    if(navigator.canShare && navigator.canShare({files:[file]}) && location.protocol!=="file:"){
-      await navigator.share({files:[file], title:"備忘錄匯出"});
-    } else {
-      downloadBlob(file, file.name);
-    }
-  }catch(err){
-    console.error(err);
-    alert("❌ 匯出失敗");
-  }
+  // AES 加密 JSON，產生 Base64 字串
+  const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
+  const blob = new Blob([encrypted], { type: "text/plain;charset=utf-8" });
+  const file = new File([blob], "notes.secure.txt", { type: "text/plain" });
+
+  downloadBlob(file, file.name);
 }
 
 function downloadBlob(blob, filename){
@@ -147,32 +139,32 @@ function downloadBlob(blob, filename){
 
 
 /* ================= importSecure ================= */
-async function importSecure(file){
-  const password = prompt("請輸入加密密碼");
-  if(!password) return;
+// 匯入
+function importSecure(file) {
+  const password = prompt("請輸入密碼");
+  if (!password) return;
 
   const reader = new FileReader();
   reader.onload = async e => {
-    try{
-      const encryptedText = e.target.result;
-      const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
+    try {
+      const encrypted = e.target.result; // 讀取純文字 Base64
+      const decrypted = CryptoJS.AES.decrypt(encrypted, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
-      if(!jsonStr) throw new Error("解密失敗或密碼錯誤");
+      if (!jsonStr) throw new Error("解密失敗");
 
       const notes = JSON.parse(jsonStr);
-      for(const note of notes){
-        save(note);
-      }
+      for (const note of notes) save(note);
 
       alert("✅ 匯入完成");
       refresh();
-    }catch(err){
+    } catch (err) {
       console.error(err);
-      alert("❌ 匯入失敗：密碼錯誤或檔案已損毀");
+      alert("❌ 解密失敗或密碼錯誤");
     }
   };
-  reader.readAsText(file); // 手機/桌機都穩定
+  reader.readAsText(file, "UTF-8"); // 指定 UTF-8
 }
+
 
 
 /* ================= refresh ================= */
