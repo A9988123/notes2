@@ -108,7 +108,7 @@ async function exportSecure() {
   // 使用 AES 加密
   const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
 
-  // 使用 Base64 進行編碼
+  // 使用 Base64 進行編碼，這裡確保使用正確的字符集
   const encryptedBase64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(encrypted));
 
   // 存成 .json 檔案
