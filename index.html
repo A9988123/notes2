@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>備忘錄</title>
-<style>
-body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
-header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-content:space-between; }
-#noteList { padding:10px; }
-.note-item { background:#fff; border-radius:10px; padding:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
-.note-title { font-size:16px; font-weight:500; }
-.note-sub { font-size:12px; color:#888; }
-.delete-btn { background:#ff4d4d; color:#fff; padding:6px 12px; border:none; border-radius:5px; cursor:pointer; font-size:12px; }
-#fab { position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%; background:#4a90e2; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-#editor { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
-#editorHeader { background:#4a90e2; color:#fff; padding:10px; display:flex; justify-content:space-between; }
-#content { flex:1; padding:12px; background:#fff; margin:10px; border-radius:10px; border:1px solid #ccc; overflow:auto; }
-#topBar button { margin-left:6px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>備忘錄</title>
+  <style>
+    body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
+    header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-content:space-between; }
+    #noteList { padding:10px; }
+    .note-item { background:#fff; border-radius:10px; padding:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+    .note-title { font-size:16px; font-weight:500; }
+    .note-sub { font-size:12px; color:#888; }
+    .delete-btn { background:#ff4d4d; color:#fff; padding:6px 12px; border:none; border-radius:5px; cursor:pointer; font-size:12px; }
+    #fab { position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%; background:#4a90e2; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    #editor { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
+    #editorHeader { background:#4a90e2; color:#fff; padding:10px; display:flex; justify-content:space-between; }
+    #content { flex:1; padding:12px; background:#fff; margin:10px; border-radius:10px; border:1px solid #ccc; overflow:auto; }
+    #topBar button { margin-left:6px; }
+  </style>
 </head>
 <body>
 
@@ -43,7 +43,7 @@ header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-co
 </div>
 
 <!-- 匯入檔案 input -->
-<input type="file" id="backupFile" accept=".zip,.json" style="display:none">
+<input type="file" id="backupFile" accept=".json" style="display:none">
 
 <script src="./jszip.min.js"></script>
 <script src="./crypto-js.min.js"></script>
@@ -55,78 +55,68 @@ const STORE = "notes";
 let db = null;
 
 function openDB() {
-  return new Promise((resolve,reject)=>{
-    const req = indexedDB.open(DB_NAME,1);
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      if(!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE,{ keyPath:"id" });
+      if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "id" });
     };
     req.onsuccess = e => { db = e.target.result; resolve(); };
     req.onerror = reject;
   });
 }
 
-function save(note){ db.transaction(STORE,"readwrite").objectStore(STORE).put(note); }
-function getAll(){ return new Promise(res=>{ const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess=()=>res(r.result||[]); }); }
-function removeAll(){ return new Promise((resolve,reject)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).clear(); tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error); }); }
-function remove(id){ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete(id); }
-
-/* ================= build zip ================= */
-async function buildZipBlob(){
-  const zip = new JSZip();
-  const notes = await getAll();
-  let html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>備忘錄</title></head><body>`;
-  for(const n of notes){
-    html+=`<h2>${n.title||"（無標題）"}</h2><div>${n.content||""}</div><hr>`;
-  }
-  html+="</body></html>";
-  zip.file("index.html",html);
-  return zip.generateAsync({type:"blob"});
-}
+function save(note) { db.transaction(STORE, "readwrite").objectStore(STORE).put(note); }
+function getAll() { return new Promise(res => { const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess = () => res(r.result || []); }); }
+function removeAll() { return new Promise((resolve, reject) => { const tx = db.transaction(STORE, "readwrite"); tx.objectStore(STORE).clear(); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+function remove(id) { const tx = db.transaction(STORE, "readwrite"); tx.objectStore(STORE).delete(id); }
 
 /* ================= CryptoJS ================= */
-async function encryptBlob(blob,password){
+async function encryptBlob(blob, password) {
   const arrayBuffer = await blob.arrayBuffer();
   const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-  const encrypted = CryptoJS.AES.encrypt(wordArray,password).toString();
-  return new Blob([encrypted],{type:"application/octet-stream"});
+  const encrypted = CryptoJS.AES.encrypt(wordArray, password).toString();
+  return new Blob([encrypted], { type: "application/octet-stream" });
 }
 
-async function decryptBlobCryptoJS(data,password){
+async function decryptBlobCryptoJS(data, password) {
   const text = new TextDecoder().decode(data);
-  const decrypted = CryptoJS.AES.decrypt(text,password);
-  if(!decrypted.sigBytes || decrypted.sigBytes<=0) throw new Error("CryptoJS decrypt failed");
+  const decrypted = CryptoJS.AES.decrypt(text, password);
+  if (!decrypted.sigBytes || decrypted.sigBytes <= 0) throw new Error("CryptoJS decrypt failed");
 
   const words = decrypted.words;
   const bytes = new Uint8Array(decrypted.sigBytes);
-  let offset=0;
-  for(let i=0;i<words.length && offset<bytes.length;i++){
+  let offset = 0;
+  for (let i = 0; i < words.length && offset < bytes.length; i++) {
     const w = words[i];
-    for(let b=3;b>=0 && offset<bytes.length;b--){
-      bytes[offset++]=(w>>(8*b))&0xff;
+    for (let b = 3; b >= 0 && offset < bytes.length; b--) {
+      bytes[offset++] = (w >> (8 * b)) & 0xff;
     }
   }
-  return new Blob([bytes],{type:"application/zip"});
+  return new Blob([bytes], { type: "application/json" });
 }
 
-/* ================= exportSecure ================= */
+/* ================= 匯出 ================= */
 async function exportSecure() {
   const password = prompt("請輸入密碼");
   if (!password) return;
 
-  const notes = await getAll();
-  const jsonStr = JSON.stringify(notes);
-  
-  // 以 JSON 格式儲存
-  const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
-  
-  const blob = new Blob([encrypted], { type: "application/json" });
-  const file = new File([blob], "notes.json", { type: "application/json" });
+  try {
+    const notes = await getAll();
+    const jsonStr = JSON.stringify(notes);
+    const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
+    const blob = new Blob([encrypted], { type: "application/json" });
+    const file = new File([blob], "notes.secure.json", { type: "application/json" });
 
-  if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
-    await navigator.share({ files: [file], title: "備忘錄匯出" });
-  } else {
-    downloadBlob(file, file.name);
+    // 桌機下載或手機分享
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
+      await navigator.share({ files: [file], title: "備忘錄匯出" });
+    } else {
+      downloadBlob(file, file.name);
+    }
+  } catch (err) {
+    console.error("匯出失敗:", err);
+    alert("❌ 匯出失敗，請重試");
   }
 }
 
@@ -140,7 +130,7 @@ function downloadBlob(blob, filename) {
   a.remove();
 }
 
-/* ================= importSecure ================= */
+/* ================= 匯入 ================= */
 function importSecure(file) {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -151,15 +141,12 @@ function importSecure(file) {
       let encrypted = e.target.result;
 
       // 移除 BOM 或不可見字元，手機瀏覽器常自動加入 BOM
-      encrypted = encrypted.replace(/^\uFEFF/, "").trim();  // 去除 BOM
-
-      // 更嚴格的檢查非可見字元
-      encrypted = encrypted.replace(/[\x00-\x1F\x7F-\x9F]/g, "");  // 去除控制字符
+      encrypted = encrypted.replace(/^\uFEFF/, "").trim();
 
       const decrypted = CryptoJS.AES.decrypt(encrypted, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
 
-      if (!jsonStr) throw new Error("解密失敗，請確認密碼是否正確或檔案未損壞");
+      if (!jsonStr) throw new Error("解密失敗");
 
       const notes = JSON.parse(jsonStr);
       for (const note of notes) save(note);
@@ -172,80 +159,32 @@ function importSecure(file) {
     }
   };
 
-  // 使用 UTF-8 格式讀取檔案
+  // UTF-8 讀取文字
   reader.readAsText(file, "UTF-8");
 }
 
 /* ================= refresh ================= */
-async function refresh(){
-  const list=document.getElementById("noteList");
-  list.innerHTML="";
+async function refresh() {
+  const list = document.getElementById("noteList");
+  list.innerHTML = "";
   const notes = await getAll();
-  notes.sort((a,b)=>b.timestamp-a.timestamp).forEach(note=>{
-    const div=document.createElement("div");
-    div.className="note-item";
-    div.innerHTML=`<div><div class="note-title">${note.title||"（無標題）"}</div><div class="note-sub">${new Date(note.timestamp).toLocaleString()}</div></div><button class="delete-btn">刪除</button>`;
-    div.onclick=()=>openEditor(note.id);
-    div.querySelector(".delete-btn").onclick = e=>{ e.stopPropagation(); if(confirm("確定刪除此備忘錄？")){ remove(note.id); refresh(); }};
+  notes.sort((a, b) => b.timestamp - a.timestamp).forEach(note => {
+    const div = document.createElement("div");
+    div.className = "note-item";
+    div.innerHTML = `<div><div class="note-title">${note.title || "（無標題）"}</div><div class="note-sub">${new Date(note.timestamp).toLocaleString()}</div></div><button class="delete-btn">刪除</button>`;
+    div.onclick = () => openEditor(note.id);
+    div.querySelector(".delete-btn").onclick = e => {
+      e.stopPropagation();
+      if (confirm("確定刪除此備忘錄？")) {
+        remove(note.id);
+        refresh();
+      }
+    };
     list.appendChild(div);
   });
 }
 
-/* ================= 新增、編輯 ================= */
-let currentId=null;
-async function newNote(){ currentId=null; content.innerHTML=""; openEditor(null); }
-async function openEditor(id){
-  currentId=id;
-  const notes = await getAll();
-  const note = notes.find(n=>n.id===id);
-  document.getElementById("content").innerHTML=note?.content||"";
-  document.getElementById("editor").style.display="flex";
-  document.getElementById("noteList").style.display="none";
-  document.getElementById("fab").style.display="none";
-}
-function closeEditor(){
-  editor.style.display="none";
-  noteList.style.display="";
-  fab.style.display="";
-  currentId=null;
-  refresh();
-}
-function saveEditor(){
-  const text = content.innerText.trim();
-  save({id:currentId||Date.now().toString(),title:text.slice(0,20),content:content.innerHTML,timestamp:Date.now()});
-  closeEditor();
-}
-
-/* ================= 刪除全部 + Undo ================= */
-let lastDeletedNotes=null;
-let undoTimer=null;
-
-async function deleteAllNotes(){
-  if(!confirm("⚠️ 確定刪除所有備忘錄？")) return;
-  lastDeletedNotes = await getAll();
-  await removeAll();
-  refresh();
-
-  const undoBtn = document.getElementById("undoBtn");
-  undoBtn.style.display="inline-block";
-
-  clearTimeout(undoTimer);
-  undoTimer = setTimeout(()=>{ lastDeletedNotes=null; undoBtn.style.display="none"; },10000);
-
-  alert("🧹 已刪除，可於 10 秒內復原");
-}
-
-async function undoDeleteAll(){
-  if(!lastDeletedNotes || !lastDeletedNotes.length) return;
-  for(const note of lastDeletedNotes) save(note);
-  lastDeletedNotes=null;
-  document.getElementById("undoBtn").style.display="none";
-  refresh();
-  alert("↩️ 已復原");
-}
-
-/* ================= 啟動 ================= */
-window.addEventListener("load", async ()=>{
+window.addEventListener("load", async () => {
   await openDB();
   refresh();
 
@@ -256,24 +195,24 @@ window.addEventListener("load", async ()=>{
   // 判斷手機或桌機
   const isMobile = window.innerWidth <= 768;
 
-  if(isMobile){
+  if (isMobile) {
     exportBtn.style.display = "none";   // 手機隱藏匯出
     importBtn.style.display = "inline-block"; // 手機顯示匯入
   } else {
     exportBtn.style.display = "inline-block"; // 桌機顯示匯出
-    importBtn.style.display = "inline-block";        // 桌機顯示匯入
+    importBtn.style.display = "inline-block"; // 桌機顯示匯入
   }
 
   exportBtn.addEventListener("click", exportSecure);
 
   // 匯入流程
-  importBtn.addEventListener("click", ()=>{
+  importBtn.addEventListener("click", () => {
     backupFile.value = "";
     backupFile.click();
   });
 
-  backupFile.addEventListener("change", ()=>{
-    if(backupFile.files.length) importSecure(backupFile.files[0]);
+  backupFile.addEventListener("change", () => {
+    if (backupFile.files.length) importSecure(backupFile.files[0]);
   });
 });
 </script>
