@@ -62,27 +62,39 @@ async function buildZipBlob(){
   return zip.generateAsync({type:"blob"});
 }
 
-/* ================= CryptoJS 加密/解密 (Base64) ================= */
-async function encryptBlob(blob, password){
-  const arrayBuffer = await blob.arrayBuffer();
-  const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-  const encrypted = CryptoJS.AES.encrypt(CryptoJS.enc.Base64.stringify(wordArray), password).toString();
-  return new Blob([encrypted], {type:"application/octet-stream"});
+/* ================= CryptoJS 安全跨平台加密/解密 ================= */
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
-async function decryptBlob(blob, password){
-  const text = await blob.text();
-  const decrypted = CryptoJS.AES.decrypt(text, password);
-  if(!decrypted.sigBytes) throw new Error("解密失敗");
-  const bytes = CryptoJS.enc.Base64.parse(decrypted.toString(CryptoJS.enc.Utf8)).words;
-  const array = new Uint8Array(decrypted.sigBytes);
-  let offset=0;
-  for(let i=0;i<bytes.length && offset<array.length;i++){
-    const w = bytes[i];
-    for(let b=3;b>=0 && offset<array.length;b--) array[offset++] = (w >> (8*b)) & 0xff;
-  }
-  return new Blob([array], {type:"application/zip"});
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const buffer = new Uint8Array(len);
+  for (let i = 0; i < len; i++) buffer[i] = binary.charCodeAt(i);
+  return buffer.buffer;
 }
+
+async function encryptBlob(blob, password) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const base64 = arrayBufferToBase64(arrayBuffer);
+  const encrypted = CryptoJS.AES.encrypt(base64, password).toString();
+  return new Blob([encrypted], { type: "application/octet-stream" });
+}
+
+async function decryptBlob(blob, password) {
+  const encryptedText = await blob.text();
+  const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
+  const base64 = decrypted.toString(CryptoJS.enc.Utf8);
+  if (!base64) throw new Error("解密失敗");
+  const arrayBuffer = base64ToArrayBuffer(base64);
+  return new Blob([arrayBuffer], { type: "application/zip" });
+}
+
 
 /* ================= exportSecure ================= */
 async function exportSecure(){
