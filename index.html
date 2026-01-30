@@ -174,18 +174,21 @@
       return zip.generateAsync({ type: "blob" });
     }
 
-    /* ================= CryptoJS 加密/解密 ================= */
 /* ================= 加密過程 ================= */
 async function encryptBlob(blob, password) {
   try {
-    const arrayBuffer = await blob.arrayBuffer();
-    const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);
-    
+    const arrayBuffer = await blob.arrayBuffer();  // 讀取 Blob 資料
+    console.log("將 Blob 轉換為 ArrayBuffer。");
+
+    const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer);  // 轉換為 CryptoJS 可處理的資料格式
+    console.log("將 ArrayBuffer 轉換為 CryptoJS WordArray。");
+
     // Step 1: 加密過程
-    const encrypted = CryptoJS.AES.encrypt(wordArray, password);
+    const encrypted = CryptoJS.AES.encrypt(wordArray, password);  // 加密
     if (!encrypted || !encrypted.toString()) {
       throw new Error("加密失敗，返回的加密數據為空。");
     }
+    console.log("加密成功。");
 
     return new Blob([encrypted.toString()], { type: "application/octet-stream" });
   } catch (err) {
@@ -210,7 +213,6 @@ async function encryptBlob(blob, password) {
       return new Blob([bytes], { type: "application/zip" });
     }
 
-    /* ================= exportSecure ================= */
 /* ================= exportSecure ================= */
 async function exportSecure() {
   const password = prompt("請輸入加密密碼");
@@ -222,15 +224,20 @@ async function exportSecure() {
   try {
     // Step 1: 生成備忘錄 ZIP 檔案
     console.log("正在生成備忘錄ZIP檔案...");
-    const zipBlob = await buildZipBlob();  
+    const zipBlob = await buildZipBlob();  // 生成 ZIP 檔案
     console.log("備忘錄ZIP檔案生成成功。");
 
     // Step 2: 對 ZIP 檔案進行加密
     console.log("正在加密備忘錄ZIP檔案...");
-    const encryptedBlob = await encryptBlob(zipBlob, password);
+    const encryptedBlob = await encryptBlob(zipBlob, password);  // 加密檔案
     console.log("備忘錄ZIP檔案加密成功。");
 
-    // Step 3: 下載加密後的檔案
+    // Step 3: 檢查加密的 Blob 是否有效
+    if (!encryptedBlob) {
+      throw new Error("加密後的檔案無效");
+    }
+
+    // Step 4: 下載加密後的檔案
     console.log("開始下載加密檔案...");
     const file = new Blob([encryptedBlob], { type: "application/octet-stream" });
     downloadBlob(file, "notes.secure.zip");
