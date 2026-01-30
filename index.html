@@ -112,11 +112,8 @@
 
   <input type="file" id="backupFile" accept=".secure.zip,.json" style="display:none">
 
-
-  <!-- 先引入 CryptoJS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1-crypto-js.min.js"></script>
-  <!-- 然後引入 JSZip -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="./jszip.min.js"></script>
+  <script src="./crypto-js.min.js"></script>
 
   <script>
     /* ================= IndexedDB ================= */
@@ -202,50 +199,31 @@
     }
 
     /* ================= exportSecure ================= */
-async function exportSecure() {
-// 檢查 CryptoJS 是否正確加載
-if (typeof CryptoJS === "undefined") {
-  alert("❌ CryptoJS 沒有正確加載！");
-  return;
+    async function exportSecure() {
+      const password = prompt("請輸入加密密碼");
+      if (!password) return;
+      try {
+        const zipBlob = await buildZipBlob();
+        const encryptedBlob = await encryptBlob(zipBlob, password);
+        const file = new File([encryptedBlob], "notes.secure.zip", { type: "application/octet-stream" });
+        if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
+          await navigator.share({ files: [file], title: "備忘錄匯出" });
+        } else downloadBlob(file, file.name);
+      } catch (err) {
+        console.error(err);
+        alert("❌ 匯出失敗");
+      }
+    }
 
-
-  const password = prompt("請輸入加密密碼");
-  if (!password) return;
-
-  try {
-    // 建立加密檔案
-    const zipBlob = await buildZipBlob();
-    const encryptedBlob = await encryptBlob(zipBlob, password);
-    const file = new File([encryptedBlob], "notes.secure.zip", { type: "application/octet-stream" });
-
-    console.log("加密檔案生成成功，開始處理下載...");
-
-    // 嘗試下載檔案（移除 navigator.share）
-    downloadBlob(file, file.name);
-  } catch (err) {
-    console.error("匯出失敗：", err);
-    alert("❌ 匯出失敗：" + err.message);
-  }
-}
-
-
-function downloadBlob(blob, filename) {
-  try {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(a.href);
-    a.remove();
-    console.log("檔案下載成功");
-  } catch (err) {
-    console.error("檔案下載失敗：", err);
-    alert("❌ 檔案下載失敗：" + err.message);
-  }
-}
-
-
+    function downloadBlob(blob, filename) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }
 
     /* ================= importSecure ================= */
     async function importSecure(file) {
