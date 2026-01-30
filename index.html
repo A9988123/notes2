@@ -124,16 +124,18 @@ async function exportSecure() {
   if (!password) return;
 
   try {
+    // 獲取所有備忘錄並轉換為 JSON 字串
     const notes = await getAll();
-    const notesData = JSON.stringify(notes); // 將資料轉為 JSON 格式
+    const notesData = JSON.stringify(notes);
 
-    // 使用 UTF-8 編碼，保證跨平台的一致性
+    // 使用 AES 加密
     const encryptedData = CryptoJS.AES.encrypt(notesData, password).toString();
 
+    // 創建加密後的檔案
     const encryptedFile = new Blob([encryptedData], { type: "application/json" });
     const file = new File([encryptedFile], "notes.secure.json", { type: "application/json" });
 
-    // 檢查是否支援分享功能
+    // 檢查是否支持分享，否則下載檔案
     if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
       await navigator.share({ files: [file], title: "備忘錄匯出" });
     } else {
@@ -144,6 +146,7 @@ async function exportSecure() {
     alert("❌ 匯出失敗");
   }
 }
+
 
 
 function downloadBlob(blob, filename) {
@@ -167,6 +170,7 @@ async function importSecure(file) {
     const fileData = await file.arrayBuffer(); // 讀取檔案內容
     const encryptedData = new TextDecoder().decode(fileData); // 確保使用 UTF-8 解碼
 
+    // 解密資料
     const decryptedData = CryptoJS.AES.decrypt(encryptedData, password).toString(CryptoJS.enc.Utf8);
 
     if (!decryptedData) {
@@ -226,13 +230,14 @@ async function refresh() {
       e.stopPropagation();
       if (confirm("確定刪除此備忘錄？")) {
         remove(note.id);
-        refresh();
+        refresh(); // 刪除後刷新頁面
       }
     };
     
     list.appendChild(div);
   });
 }
+
 
 
 function encryptContent(content) {
@@ -265,7 +270,7 @@ function closeEditor(){
   currentId=null;
   refresh();
 }
-function saveEditor() {
+async function saveEditor() {
   const text = content.innerText.trim();
   const note = {
     id: currentId || Date.now().toString(),
@@ -274,10 +279,16 @@ function saveEditor() {
     timestamp: Date.now()
   };
   
-  save(note); // 儲存至 IndexedDB
-  refresh(); // 更新頁面顯示
-  closeEditor(); // 關閉編輯頁面
+  // 儲存到 IndexedDB
+  save(note);
+  
+  // 刷新頁面，並立即顯示新增的備忘錄
+  refresh();
+  
+  // 關閉編輯頁面
+  closeEditor();
 }
+
 
 
 /* ================= 刪除全部 + Undo ================= */
