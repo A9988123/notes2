@@ -149,12 +149,17 @@ function importSecure(file) {
   reader.onload = async e => {
     try {
       let encrypted = e.target.result;
+
+      // 移除 BOM 或不可見字元，手機瀏覽器常自動加入 BOM
       encrypted = encrypted.replace(/^\uFEFF/, "").trim();  // 去除 BOM
+
+      // 更嚴格的檢查非可見字元
+      encrypted = encrypted.replace(/[\x00-\x1F\x7F-\x9F]/g, "");  // 去除控制字符
 
       const decrypted = CryptoJS.AES.decrypt(encrypted, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
 
-      if (!jsonStr) throw new Error("解密失敗");
+      if (!jsonStr) throw new Error("解密失敗，請確認密碼是否正確或檔案未損壞");
 
       const notes = JSON.parse(jsonStr);
       for (const note of notes) save(note);
@@ -167,6 +172,7 @@ function importSecure(file) {
     }
   };
 
+  // 使用 UTF-8 格式讀取檔案
   reader.readAsText(file, "UTF-8");
 }
 
