@@ -97,7 +97,7 @@ async function decryptBlobCryptoJS(data, password) {
 }
 
 /* ================= 匯出 ================= */
-// 匯出功能
+// 加密並轉換為 Base64
 async function exportSecure() {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -108,7 +108,7 @@ async function exportSecure() {
   // AES 加密 JSON 字串
   const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
 
-  // Base64 編碼加密後的字串
+  // Base64 編碼加密字串
   const encryptedBase64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(encrypted));
 
   // 存成 JSON 檔案
@@ -123,6 +123,7 @@ async function exportSecure() {
   }
 }
 
+
 function downloadBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -135,7 +136,7 @@ function downloadBlob(blob, filename) {
 
 
 /* ================= 匯入 ================= */
-// 匯入功能
+// 匯入功能，從檔案解密
 function importSecure(file) {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -145,12 +146,13 @@ function importSecure(file) {
     try {
       let encrypted = e.target.result;
 
-      // 清理 BOM 或不可見字元（特別是在手機端）
+      // 清理 BOM 字符或其他不可見字符（特別是在手機端）
       encrypted = encrypted.replace(/^\uFEFF/, "").trim();
 
-      // 將 Base64 字串轉回原始加密資料
+      // 將 Base64 編碼字串解碼為原始加密資料
       const base64Decoded = CryptoJS.enc.Base64.parse(encrypted).toString(CryptoJS.enc.Utf8);
 
+      // 解密 Base64 解碼後的資料
       const decrypted = CryptoJS.AES.decrypt(base64Decoded, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
 
@@ -167,10 +169,9 @@ function importSecure(file) {
     }
   };
 
-  // UTF-8 讀取文字
+  // 讀取文件內容，使用 UTF-8 編碼
   reader.readAsText(file, "UTF-8");
 }
-
 
 /* ================= refresh ================= */
 async function refresh() {
