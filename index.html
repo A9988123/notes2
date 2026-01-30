@@ -139,29 +139,48 @@ function downloadBlob(blob,filename){
 }
 
 /* ================= importSecure ================= */
-async function importSecure(file){
+function importSecure(file){
   const password = prompt("請輸入加密密碼");
   if(!password) return;
 
-  try{
-    const data = new Uint8Array(await file.arrayBuffer());
-    const zipBlob = await decryptBlobCryptoJS(data,password);
-    const zip = await JSZip.loadAsync(zipBlob);
-    const html = await zip.file("index.html").async("text");
-    const div = document.createElement("div");
-    div.innerHTML = html;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const encryptedText = e.target.result;
+      const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
+      if(!decrypted.sigBytes || decrypted.sigBytes <= 0) throw new Error("解密失敗");
 
-    [...div.querySelectorAll("h2")].forEach((h,i)=>{
-      save({id:Date.now()+"_"+i,title:h.textContent,content:h.nextElementSibling?.innerHTML||"",timestamp:Date.now()});
-    });
+      // 將 WordArray 轉 Uint8Array
+      const words = decrypted.words;
+      const bytes = new Uint8Array(decrypted.sigBytes);
+      let offset = 0;
+      for(let i=0; i<words.length && offset<bytes.length; i++){
+        const w = words[i];
+        for(let b=3; b>=0 && offset<bytes.length; b--){
+          bytes[offset++] = (w >> (8*b)) & 0xff;
+        }
+      }
 
-    alert("✅ 匯入完成");
-    refresh();
-  }catch(err){
-    console.error(err);
-    alert("❌ 解密失敗：密碼錯誤或檔案已損毀");
-  }
+      const zipBlob = new Blob([bytes], {type: "application/zip"});
+      const zip = await JSZip.loadAsync(zipBlob);
+      const html = await zip.file("index.html").async("text");
+
+      const div = document.createElement("div");
+      div.innerHTML = html;
+      [...div.querySelectorAll("h2")].forEach((h,i)=>{
+        save({id:Date.now()+"_"+i, title:h.textContent, content:h.nextElementSibling?.innerHTML||"", timestamp:Date.now()});
+      });
+
+      alert("✅ 匯入完成");
+      refresh();
+    } catch(err) {
+      console.error(err);
+      alert("❌ 解密失敗或檔案損毀");
+    }
+  };
+  reader.readAsText(file); // 使用 readAsText
 }
+
 
 /* ================= refresh ================= */
 async function refresh(){
