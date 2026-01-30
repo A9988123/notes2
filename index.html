@@ -124,19 +124,13 @@ async function exportSecure() {
   if (!password) return;
 
   try {
-    // 取得所有備忘錄
     const notes = await getAll();
-    
-    // 將備忘錄轉換為 JSON 格式
-    const notesData = JSON.stringify(notes);
-    
-    // 加密備忘錄資料
+    const notesData = JSON.stringify(notes); // 將資料轉為 JSON 格式
+
+    // 使用 UTF-8 編碼，保證跨平台的一致性
     const encryptedData = CryptoJS.AES.encrypt(notesData, password).toString();
 
-    // 創建加密的 JSON 檔案
     const encryptedFile = new Blob([encryptedData], { type: "application/json" });
-    
-    // 下載加密檔案
     const file = new File([encryptedFile], "notes.secure.json", { type: "application/json" });
 
     // 檢查是否支援分享功能
@@ -150,6 +144,7 @@ async function exportSecure() {
     alert("❌ 匯出失敗");
   }
 }
+
 
 function downloadBlob(blob, filename) {
   const a = document.createElement("a");
@@ -169,22 +164,18 @@ async function importSecure(file) {
   if (!password) return;
 
   try {
-    // 讀取加密檔案
-    const fileData = await file.arrayBuffer();
-    const encryptedData = new TextDecoder().decode(fileData);
-    
-    // 解密資料
+    const fileData = await file.arrayBuffer(); // 讀取檔案內容
+    const encryptedData = new TextDecoder().decode(fileData); // 確保使用 UTF-8 解碼
+
     const decryptedData = CryptoJS.AES.decrypt(encryptedData, password).toString(CryptoJS.enc.Utf8);
 
-    // 如果解密失敗
     if (!decryptedData) {
       alert("❌ 解密失敗：密碼錯誤或檔案已損毀");
       return;
     }
 
-    // 解析解密後的 JSON 資料
     const notes = JSON.parse(decryptedData);
-    
+
     // 保存解密後的資料
     notes.forEach(note => {
       save({
@@ -204,17 +195,20 @@ async function importSecure(file) {
 }
 
 
-async function refresh(){
+
+async function refresh() {
   const list = document.getElementById("noteList");
   list.innerHTML = "";
   const notes = await getAll();
 
+  // 判斷是否為手機模式
   const isMobile = window.innerWidth <= 768;
 
   notes.sort((a, b) => b.timestamp - a.timestamp).forEach(note => {
     const div = document.createElement("div");
     div.className = "note-item";
 
+    // 顯示解密後或加密後的編碼符號
     const contentDisplay = isMobile ? decryptContent(note.content) : encryptContent(note.content);
 
     div.innerHTML = `
@@ -225,7 +219,7 @@ async function refresh(){
       </div>
       <button class="delete-btn">刪除</button>
     `;
-
+    
     div.onclick = () => openEditor(note.id);
 
     div.querySelector(".delete-btn").onclick = e => {
@@ -235,10 +229,11 @@ async function refresh(){
         refresh();
       }
     };
-
+    
     list.appendChild(div);
   });
 }
+
 
 function encryptContent(content) {
   const encrypted = CryptoJS.AES.encrypt(content, 'yourPassword').toString();
@@ -270,11 +265,20 @@ function closeEditor(){
   currentId=null;
   refresh();
 }
-function saveEditor(){
+function saveEditor() {
   const text = content.innerText.trim();
-  save({id:currentId||Date.now().toString(),title:text.slice(0,20),content:content.innerHTML,timestamp:Date.now()});
-  closeEditor();
+  const note = {
+    id: currentId || Date.now().toString(),
+    title: text.slice(0, 20),
+    content: content.innerHTML,
+    timestamp: Date.now()
+  };
+  
+  save(note); // 儲存至 IndexedDB
+  refresh(); // 更新頁面顯示
+  closeEditor(); // 關閉編輯頁面
 }
+
 
 /* ================= 刪除全部 + Undo ================= */
 let lastDeletedNotes=null;
