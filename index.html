@@ -97,7 +97,7 @@ async function decryptBlobCryptoJS(data, password) {
 }
 
 /* ================= 匯出 ================= */
-// 加密並轉換為 Base64
+// 匯出並加密資料
 async function exportSecure() {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -105,13 +105,13 @@ async function exportSecure() {
   const notes = await getAll();
   const jsonStr = JSON.stringify(notes);
 
-  // AES 加密 JSON 字串
+  // 使用 AES 加密
   const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
 
-  // Base64 編碼加密字串
+  // 使用 Base64 進行編碼
   const encryptedBase64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(encrypted));
 
-  // 存成 JSON 檔案
+  // 存成 .json 檔案
   const blob = new Blob([encryptedBase64], { type: "application/json" });
   const file = new File([blob], "notes.secure.json", { type: "application/json" });
 
@@ -122,7 +122,6 @@ async function exportSecure() {
     downloadBlob(file, file.name);
   }
 }
-
 
 function downloadBlob(blob, filename) {
   const a = document.createElement("a");
@@ -136,7 +135,7 @@ function downloadBlob(blob, filename) {
 
 
 /* ================= 匯入 ================= */
-// 匯入功能，從檔案解密
+// 匯入並解密資料
 function importSecure(file) {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -146,18 +145,19 @@ function importSecure(file) {
     try {
       let encrypted = e.target.result;
 
-      // 清理 BOM 字符或其他不可見字符（特別是在手機端）
+      // 移除 BOM 字符（某些手機瀏覽器會自動加入）
       encrypted = encrypted.replace(/^\uFEFF/, "").trim();
 
-      // 將 Base64 編碼字串解碼為原始加密資料
+      // 解碼 Base64 字串
       const base64Decoded = CryptoJS.enc.Base64.parse(encrypted).toString(CryptoJS.enc.Utf8);
 
-      // 解密 Base64 解碼後的資料
+      // 解密並轉換為 UTF-8
       const decrypted = CryptoJS.AES.decrypt(base64Decoded, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
 
       if (!jsonStr) throw new Error("解密失敗");
 
+      // 解析解密後的資料
       const notes = JSON.parse(jsonStr);
       for (const note of notes) save(note);
 
@@ -169,9 +169,10 @@ function importSecure(file) {
     }
   };
 
-  // 讀取文件內容，使用 UTF-8 編碼
+  // 使用 UTF-8 編碼讀取檔案
   reader.readAsText(file, "UTF-8");
 }
+
 
 /* ================= refresh ================= */
 async function refresh() {
