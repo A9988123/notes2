@@ -42,98 +42,67 @@ header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-co
   <div id="content" contenteditable="true"></div>
 </div>
 
-<input type="file" id="backupFile" accept=".secure.zip,.json" style="display:none">
+<input type="file" id="backupFile" accept=".secure.txt,.json" style="display:none">
 
-<script src="./jszip.min.js"></script>
 <script src="./crypto-js.min.js"></script>
 
 <script>
 /* ================= IndexedDB ================= */
 const DB_NAME = "memoDB";
 const STORE = "notes";
-let db = null;
+let db=null;
 
-function openDB() {
+function openDB(){
   return new Promise((resolve,reject)=>{
-    const req = indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded = e => {
-      const d = e.target.result;
-      if(!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE,{ keyPath:"id" });
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE,{keyPath:"id"});
     };
-    req.onsuccess = e => { db = e.target.result; resolve(); };
-    req.onerror = reject;
+    req.onsuccess=e=>{ db=e.target.result; resolve(); };
+    req.onerror=reject;
   });
 }
 
 function save(note){ db.transaction(STORE,"readwrite").objectStore(STORE).put(note); }
-function getAll(){ return new Promise(res=>{ const r = db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess=()=>res(r.result||[]); }); }
+function getAll(){ return new Promise(res=>{ const r=db.transaction(STORE).objectStore(STORE).getAll(); r.onsuccess=()=>res(r.result||[]); }); }
 function removeAll(){ return new Promise((resolve,reject)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).clear(); tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error); }); }
 function remove(id){ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).delete(id); }
 
-/* ================= build zip ================= */
-async function buildZipBlob(){
-  const zip = new JSZip();
-  const notes = await getAll();
-  let html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>備忘錄</title></head><body>`;
+/* ================= build HTML ================= */
+async function buildHTML(){
+  const notes=await getAll();
+  let html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>備忘錄</title></head><body>';
   for(const n of notes){
     html+=`<h2>${n.title||"（無標題）"}</h2><div>${n.content||""}</div><hr>`;
   }
   html+="</body></html>";
-  zip.file("index.html",html);
-  return zip.generateAsync({type:"blob"});
+  return html;
 }
 
-/* ================= Base64 + CryptoJS ================= */
-// Blob → Base64
-async function blobToBase64(blob){
-  return new Promise(res=>{
-    const reader = new FileReader();
-    reader.onload = ()=>res(reader.result.split(",")[1]);
-    reader.readAsDataURL(blob);
-  });
+/* ================= CryptoJS 加密/解密 ================= */
+function encryptText(text,password){
+  return CryptoJS.AES.encrypt(text,password).toString(); // Base64 字串
 }
-
-// Base64 → Blob
-function base64ToBlob(base64,type="application/zip"){
-  const bin = atob(base64);
-  const len = bin.length;
-  const u8 = new Uint8Array(len);
-  for(let i=0;i<len;i++) u8[i]=bin.charCodeAt(i);
-  return new Blob([u8],{type});
-}
-
-// AES 加密
-async function encryptBlob(blob,password){
-  const base64 = await blobToBase64(blob);
-  const encrypted = CryptoJS.AES.encrypt(base64,password).toString();
-  return new Blob([encrypted],{type:"application/octet-stream"});
-}
-
-// AES 解密 → Blob
-async function decryptBlobCryptoJS(data,password){
-  const text = new TextDecoder().decode(data);
-  const decrypted = CryptoJS.AES.decrypt(text,password).toString(CryptoJS.enc.Utf8);
-  if(!decrypted) throw new Error("CryptoJS decrypt failed");
-  return base64ToBlob(decrypted,"application/zip");
+function decryptText(text,password){
+  const decrypted=CryptoJS.AES.decrypt(text,password);
+  if(!decrypted.sigBytes||decrypted.sigBytes<=0) throw new Error("decrypt failed");
+  return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
 /* ================= exportSecure ================= */
 async function exportSecure(){
-  const password = prompt("請輸入加密密碼");
+  const password=prompt("請輸入加密密碼");
   if(!password) return;
-
   try{
-    const zipBlob = await buildZipBlob();
-    const encryptedBlob = await encryptBlob(zipBlob,password);
-    const file = new File([encryptedBlob],"notes.secure.zip",{type:"application/octet-stream"});
-
+    const html=await buildHTML();
+    const encrypted=encryptText(html,password);
+    const blob=new Blob([encrypted],{type:"text/plain"});
+    const file=new File([blob],"notes.secure.txt",{type:"text/plain"});
     if(navigator.canShare && navigator.canShare({files:[file]}) && location.protocol!=="file:"){
       await navigator.share({files:[file],title:"備忘錄匯出"});
-    } else downloadBlob(file,file.name);
-  }catch(err){
-    console.error(err);
-    alert("❌ 匯出失敗");
-  }
+    }else downloadBlob(file,file.name);
+  }catch(err){ console.error(err); alert("❌ 匯出失敗"); }
 }
 
 function downloadBlob(blob,filename){
@@ -148,21 +117,16 @@ function downloadBlob(blob,filename){
 
 /* ================= importSecure ================= */
 async function importSecure(file){
-  const password = prompt("請輸入加密密碼");
+  const password=prompt("請輸入加密密碼");
   if(!password) return;
-
   try{
-    const data = new Uint8Array(await file.arrayBuffer());
-    const zipBlob = await decryptBlobCryptoJS(data,password);
-    const zip = await JSZip.loadAsync(zipBlob);
-    const html = await zip.file("index.html").async("text");
-    const div = document.createElement("div");
-    div.innerHTML = html;
-
+    const text=await file.text();
+    const html=decryptText(text,password);
+    const div=document.createElement("div");
+    div.innerHTML=html;
     [...div.querySelectorAll("h2")].forEach((h,i)=>{
       save({id:Date.now()+"_"+i,title:h.textContent,content:h.nextElementSibling?.innerHTML||"",timestamp:Date.now()});
     });
-
     alert("✅ 匯入完成");
     refresh();
   }catch(err){
@@ -175,13 +139,13 @@ async function importSecure(file){
 async function refresh(){
   const list=document.getElementById("noteList");
   list.innerHTML="";
-  const notes = await getAll();
+  const notes=await getAll();
   notes.sort((a,b)=>b.timestamp-a.timestamp).forEach(note=>{
     const div=document.createElement("div");
     div.className="note-item";
     div.innerHTML=`<div><div class="note-title">${note.title||"（無標題）"}</div><div class="note-sub">${new Date(note.timestamp).toLocaleString()}</div></div><button class="delete-btn">刪除</button>`;
     div.onclick=()=>openEditor(note.id);
-    div.querySelector(".delete-btn").onclick = e=>{
+    div.querySelector(".delete-btn").onclick=e=>{
       e.stopPropagation();
       if(confirm("確定刪除此備忘錄？")){
         remove(note.id);
@@ -192,13 +156,13 @@ async function refresh(){
   });
 }
 
-/* ================= 新增、編輯 ================= */
+/* ================= 新增/編輯 ================= */
 let currentId=null;
 async function newNote(){ currentId=null; content.innerHTML=""; openEditor(null); }
 async function openEditor(id){
   currentId=id;
-  const notes = await getAll();
-  const note = notes.find(n=>n.id===id);
+  const notes=await getAll();
+  const note=notes.find(n=>n.id===id);
   document.getElementById("content").innerHTML=note?.content||"";
   document.getElementById("editor").style.display="flex";
   document.getElementById("noteList").style.display="none";
@@ -212,7 +176,7 @@ function closeEditor(){
   refresh();
 }
 function saveEditor(){
-  const text = content.innerText.trim();
+  const text=content.innerText.trim();
   save({id:currentId||Date.now().toString(),title:text.slice(0,20),content:content.innerHTML,timestamp:Date.now()});
   closeEditor();
 }
@@ -223,21 +187,18 @@ let undoTimer=null;
 
 async function deleteAllNotes(){
   if(!confirm("⚠️ 確定刪除所有備忘錄？")) return;
-  lastDeletedNotes = await getAll();
+  lastDeletedNotes=await getAll();
   await removeAll();
   refresh();
-
-  const undoBtn = document.getElementById("undoBtn");
+  const undoBtn=document.getElementById("undoBtn");
   undoBtn.style.display="inline-block";
-
   clearTimeout(undoTimer);
-  undoTimer = setTimeout(()=>{ lastDeletedNotes=null; undoBtn.style.display="none"; },10000);
-
+  undoTimer=setTimeout(()=>{ lastDeletedNotes=null; undoBtn.style.display="none"; },10000);
   alert("🧹 已刪除，可於 10 秒內復原");
 }
 
 async function undoDeleteAll(){
-  if(!lastDeletedNotes || !lastDeletedNotes.length) return;
+  if(!lastDeletedNotes||!lastDeletedNotes.length) return;
   for(const note of lastDeletedNotes) save(note);
   lastDeletedNotes=null;
   document.getElementById("undoBtn").style.display="none";
@@ -249,7 +210,6 @@ async function undoDeleteAll(){
 window.addEventListener("load",async()=>{
   await openDB();
   refresh();
-
   document.getElementById("exportBtn").addEventListener("click",exportSecure);
   const importBtn=document.getElementById("importBtn");
   const backupFile=document.getElementById("backupFile");
@@ -258,7 +218,9 @@ window.addEventListener("load",async()=>{
     backupFile.value="";
     backupFile.click();
   });
-  backupFile.addEventListener("change",()=>{ if(backupFile.files.length) importSecure(backupFile.files[0]); });
+  backupFile.addEventListener("change",()=>{
+    if(backupFile.files.length) importSecure(backupFile.files[0]);
+  });
 });
 </script>
 
