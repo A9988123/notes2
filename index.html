@@ -43,7 +43,7 @@ header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-co
 </div>
 
 <!-- 匯入檔案 input -->
-<input type="file" id="backupFile" accept=".secure.zip,.json" style="display:none">
+<input type="file" id="backupFile" accept=".zip,.json" style="display:none">
 
 <script src="./jszip.min.js"></script>
 <script src="./crypto-js.min.js"></script>
@@ -110,24 +110,27 @@ async function decryptBlobCryptoJS(data,password){
 }
 
 /* ================= exportSecure ================= */
-
-// 匯出
 async function exportSecure() {
   const password = prompt("請輸入密碼");
   if (!password) return;
 
   const notes = await getAll();
   const jsonStr = JSON.stringify(notes);
-
-  // AES 加密 JSON，產生 Base64 字串
+  
+  // 以 JSON 格式儲存
   const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
-  const blob = new Blob([encrypted], { type: "text/plain;charset=utf-8" });
-  const file = new File([blob], "notes.secure.txt", { type: "text/plain" });
+  
+  const blob = new Blob([encrypted], { type: "application/json" });
+  const file = new File([blob], "notes.json", { type: "application/json" });
 
-  downloadBlob(file, file.name);
+  if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
+    await navigator.share({ files: [file], title: "備忘錄匯出" });
+  } else {
+    downloadBlob(file, file.name);
+  }
 }
 
-function downloadBlob(blob, filename){
+function downloadBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -137,9 +140,7 @@ function downloadBlob(blob, filename){
   a.remove();
 }
 
-
 /* ================= importSecure ================= */
-// 匯入
 function importSecure(file) {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -147,9 +148,12 @@ function importSecure(file) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      const encrypted = e.target.result; // 讀取純文字 Base64
+      let encrypted = e.target.result;
+      encrypted = encrypted.replace(/^\uFEFF/, "").trim();  // 去除 BOM
+
       const decrypted = CryptoJS.AES.decrypt(encrypted, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
+
       if (!jsonStr) throw new Error("解密失敗");
 
       const notes = JSON.parse(jsonStr);
@@ -159,13 +163,12 @@ function importSecure(file) {
       refresh();
     } catch (err) {
       console.error(err);
-      alert("❌ 解密失敗或密碼錯誤");
+      alert("❌ 匯入失敗：密碼錯誤或檔案已損毀");
     }
   };
-  reader.readAsText(file, "UTF-8"); // 指定 UTF-8
+
+  reader.readAsText(file, "UTF-8");
 }
-
-
 
 /* ================= refresh ================= */
 async function refresh(){
@@ -177,13 +180,7 @@ async function refresh(){
     div.className="note-item";
     div.innerHTML=`<div><div class="note-title">${note.title||"（無標題）"}</div><div class="note-sub">${new Date(note.timestamp).toLocaleString()}</div></div><button class="delete-btn">刪除</button>`;
     div.onclick=()=>openEditor(note.id);
-    div.querySelector(".delete-btn").onclick = e=>{
-      e.stopPropagation();
-      if(confirm("確定刪除此備忘錄？")){
-        remove(note.id);
-        refresh();
-      }
-    };
+    div.querySelector(".delete-btn").onclick = e=>{ e.stopPropagation(); if(confirm("確定刪除此備忘錄？")){ remove(note.id); refresh(); }};
     list.appendChild(div);
   });
 }
@@ -258,12 +255,8 @@ window.addEventListener("load", async ()=>{
     importBtn.style.display = "inline-block"; // 手機顯示匯入
   } else {
     exportBtn.style.display = "inline-block"; // 桌機顯示匯出
-    importBtn.style.display = "none";        // 桌機隱藏匯入
+    importBtn.style.display = "inline-block";        // 桌機顯示匯入
   }
-
-  // 桌機模式顯示匯出與匯入按鈕
-  exportBtn.style.display = "inline-block";
-  importBtn.style.display = "inline-block";
 
   exportBtn.addEventListener("click", exportSecure);
 
