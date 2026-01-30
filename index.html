@@ -115,6 +115,9 @@
   <script src="./jszip.min.js"></script>
   <script src="./crypto-js.min.js"></script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+
   <script>
     /* ================= IndexedDB ================= */
     const DB_NAME = "memoDB";
@@ -200,6 +203,13 @@
 
     /* ================= exportSecure ================= */
 async function exportSecure() {
+  // 檢查 JSZip 是否加載成功
+  if (typeof JSZip === "undefined") {
+    alert("❌ JSZip 沒有正確加載！");
+    return;
+  }
+
+
   const password = prompt("請輸入加密密碼");
   if (!password) return;
 
