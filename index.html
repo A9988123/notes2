@@ -97,6 +97,7 @@ async function decryptBlobCryptoJS(data, password) {
 }
 
 /* ================= 匯出 ================= */
+// 匯出功能
 async function exportSecure() {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -104,8 +105,10 @@ async function exportSecure() {
   const notes = await getAll();
   const jsonStr = JSON.stringify(notes);
 
-  // AES 加密 JSON → Base64 字串
+  // AES 加密 JSON 字串
   const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
+
+  // Base64 編碼加密後的字串
   const encryptedBase64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(encrypted));
 
   // 存成 JSON 檔案
@@ -130,7 +133,9 @@ function downloadBlob(blob, filename) {
   a.remove();
 }
 
+
 /* ================= 匯入 ================= */
+// 匯入功能
 function importSecure(file) {
   const password = prompt("請輸入密碼");
   if (!password) return;
@@ -165,6 +170,7 @@ function importSecure(file) {
   // UTF-8 讀取文字
   reader.readAsText(file, "UTF-8");
 }
+
 
 /* ================= refresh ================= */
 async function refresh() {
