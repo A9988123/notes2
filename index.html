@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>備忘錄</title>
-<style>
-body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
-header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-content:space-between; }
-#noteList { padding:10px; }
-.note-item { background:#fff; border-radius:10px; padding:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
-.note-title { font-size:16px; font-weight:500; }
-.note-sub { font-size:12px; color:#888; }
-.delete-btn { background:#ff4d4d; color:#fff; padding:6px 12px; border:none; border-radius:5px; cursor:pointer; font-size:12px; }
-#fab { position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%; background:#4a90e2; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; }
-#editor { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
-#editorHeader { background:#4a90e2; color:#fff; padding:10px; display:flex; justify-content:space-between; }
-#content { flex:1; padding:12px; background:#fff; margin:10px; border-radius:10px; border:1px solid #ccc; overflow:auto; }
-#topBar button { margin-left:6px; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>備忘錄</title>
+  <style>
+    body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
+    header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-content:space-between; }
+    #noteList { padding:10px; }
+    .note-item { background:#fff; border-radius:10px; padding:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+    .note-title { font-size:16px; font-weight:500; }
+    .note-sub { font-size:12px; color:#888; }
+    .delete-btn { background:#ff4d4d; color:#fff; padding:6px 12px; border:none; border-radius:5px; cursor:pointer; font-size:12px; }
+    #fab { position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%; background:#4a90e2; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; }
+    #editor { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
+    #editorHeader { background:#4a90e2; color:#fff; padding:10px; display:flex; justify-content:space-between; }
+    #content { flex:1; padding:12px; background:#fff; margin:10px; border-radius:10px; border:1px solid #ccc; overflow:auto; }
+    #topBar button { margin-left:6px; }
+  </style>
 </head>
 <body>
 
@@ -42,7 +42,8 @@ header { padding:14px; font-size:22px; font-weight:600; display:flex; justify-co
   <div id="content" contenteditable="true"></div>
 </div>
 
-<input type="file" id="backupFile" accept=".secure.zip,.json" style="display:none">
+<input type="file" id="backupFile" style="display:none" />
+
 
 <script src="./jszip.min.js"></script>
 <script src="./crypto-js.min.js"></script>
@@ -91,91 +92,129 @@ async function encryptBlob(blob,password){
   return new Blob([encrypted],{type:"application/octet-stream"});
 }
 
-async function decryptBlobCryptoJS(data,password){
-  const text = new TextDecoder().decode(data);
-  const decrypted = CryptoJS.AES.decrypt(text,password);
-  if(!decrypted.sigBytes || decrypted.sigBytes<=0) throw new Error("CryptoJS decrypt failed");
+async function decryptBlobCryptoJS(data, password) {
+  try {
+    const text = new TextDecoder().decode(data);
+    const decrypted = CryptoJS.AES.decrypt(text, password);
 
-  const words = decrypted.words;
-  const bytes = new Uint8Array(decrypted.sigBytes);
-  let offset=0;
-  for(let i=0;i<words.length && offset<bytes.length;i++){
-    const w = words[i];
-    for(let b=3;b>=0 && offset<bytes.length;b--){
-      bytes[offset++]=(w>>(8*b))&0xff;
+    if (!decrypted.sigBytes || decrypted.sigBytes <= 0) throw new Error("CryptoJS decrypt failed");
+
+    const words = decrypted.words;
+    const bytes = new Uint8Array(decrypted.sigBytes);
+    let offset = 0;
+
+    for (let i = 0; i < words.length && offset < bytes.length; i++) {
+      const w = words[i];
+      for (let b = 3; b >= 0 && offset < bytes.length; b--) {
+        bytes[offset++] = (w >> (8 * b)) & 0xff;
+      }
     }
+
+    return new Blob([bytes], { type: "application/zip" });
+  } catch (err) {
+    console.error("解密過程錯誤:", err);
+    alert("❌ 解密過程中出現錯誤，請檢查密碼或檔案格式！");
+    throw err;
   }
-  return new Blob([bytes],{type:"application/zip"});
 }
 
 /* ================= exportSecure ================= */
-async function exportSecure(){
+async function exportSecure() {
   const password = prompt("請輸入加密密碼");
-  if(!password) return;
+  if (!password) return;
 
-  try{
-    const zipBlob = await buildZipBlob();
-    const encryptedBlob = await encryptBlob(zipBlob,password);
-    const file = new File([encryptedBlob],"notes.secure.zip",{type:"application/octet-stream"});
+  try {
+    // 取得所有備忘錄
+    const notes = await getAll();
+    
+    // 將備忘錄轉換為 JSON 格式
+    const notesData = JSON.stringify(notes);
+    
+    // 加密備忘錄資料
+    const encryptedData = CryptoJS.AES.encrypt(notesData, password).toString();
 
-    if(navigator.canShare && navigator.canShare({files:[file]}) && location.protocol!=="file:"){
-      await navigator.share({files:[file],title:"備忘錄匯出"});
-    } else downloadBlob(file,file.name);
-  }catch(err){
-    console.error(err);
+    // 創建加密的 JSON 檔案
+    const encryptedFile = new Blob([encryptedData], { type: "application/json" });
+    
+    // 下載加密檔案
+    const file = new File([encryptedFile], "notes.secure.json", { type: "application/json" });
+
+    // 檢查是否支援分享功能
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
+      await navigator.share({ files: [file], title: "備忘錄匯出" });
+    } else {
+      downloadBlob(file, file.name); // 下載檔案
+    }
+  } catch (err) {
+    console.error("匯出錯誤:", err);
     alert("❌ 匯出失敗");
   }
 }
 
-function downloadBlob(blob,filename){
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=filename;
+function downloadBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   URL.revokeObjectURL(a.href);
   a.remove();
 }
 
+
 /* ================= importSecure ================= */
-async function importSecure(file){
+/* ================= importSecure ================= */
+async function importSecure(file) {
   const password = prompt("請輸入加密密碼");
-  if(!password) return;
+  if (!password) return;
 
-  try{
-    const data = new Uint8Array(await file.arrayBuffer());
-    const zipBlob = await decryptBlobCryptoJS(data,password);
-    const zip = await JSZip.loadAsync(zipBlob);
-    const html = await zip.file("index.html").async("text");
-    const div = document.createElement("div");
-    div.innerHTML = html;
+  try {
+    // 讀取加密檔案
+    const fileData = await file.arrayBuffer();
+    const encryptedData = new TextDecoder().decode(fileData);
+    
+    // 解密資料
+    const decryptedData = CryptoJS.AES.decrypt(encryptedData, password).toString(CryptoJS.enc.Utf8);
 
-    [...div.querySelectorAll("h2")].forEach((h,i)=>{
-      save({id:Date.now()+"_"+i,title:h.textContent,content:h.nextElementSibling?.innerHTML||"",timestamp:Date.now()});
+    // 如果解密失敗
+    if (!decryptedData) {
+      alert("❌ 解密失敗：密碼錯誤或檔案已損毀");
+      return;
+    }
+
+    // 解析解密後的 JSON 資料
+    const notes = JSON.parse(decryptedData);
+    
+    // 保存解密後的資料
+    notes.forEach(note => {
+      save({
+        id: note.id || Date.now().toString(),
+        title: note.title || "（無標題）",
+        content: note.content || "",
+        timestamp: note.timestamp || Date.now()
+      });
     });
 
     alert("✅ 匯入完成");
-    refresh();
-  }catch(err){
-    console.error(err);
-    alert("❌ 解密失敗：密碼錯誤或檔案已損毀");
+    refresh(); // 刷新備忘錄列表
+  } catch (err) {
+    console.error("解密過程錯誤:", err);
+    alert("❌ 解密失敗：密碼錯誤或檔案格式不正確");
   }
 }
 
-/* ================= refresh ================= */
+
 async function refresh(){
   const list = document.getElementById("noteList");
   list.innerHTML = "";
   const notes = await getAll();
-  
-  // 判斷設備模式
-  const isMobile = window.innerWidth <= 768; // 可以調整這個條件
+
+  const isMobile = window.innerWidth <= 768;
 
   notes.sort((a, b) => b.timestamp - a.timestamp).forEach(note => {
     const div = document.createElement("div");
     div.className = "note-item";
-    
-    // 顯示解密後或加密後的編碼符號
+
     const contentDisplay = isMobile ? decryptContent(note.content) : encryptContent(note.content);
 
     div.innerHTML = `
@@ -186,9 +225,9 @@ async function refresh(){
       </div>
       <button class="delete-btn">刪除</button>
     `;
-    
+
     div.onclick = () => openEditor(note.id);
-    
+
     div.querySelector(".delete-btn").onclick = e => {
       e.stopPropagation();
       if (confirm("確定刪除此備忘錄？")) {
@@ -196,14 +235,13 @@ async function refresh(){
         refresh();
       }
     };
-    
+
     list.appendChild(div);
   });
 }
 
-// 假設加密和解密操作使用 CryptoJS
 function encryptContent(content) {
-  const encrypted = CryptoJS.AES.encrypt(content, 'yourPassword').toString(); // 密碼需可動態設定
+  const encrypted = CryptoJS.AES.encrypt(content, 'yourPassword').toString();
   return `<span class="encrypted-content">${encrypted}</span>`;
 }
 
@@ -275,10 +313,7 @@ window.addEventListener("load",async()=>{
   const importBtn=document.getElementById("importBtn");
   const backupFile=document.getElementById("backupFile");
 
-  importBtn.addEventListener("click",()=>{
-    backupFile.value="";
-    backupFile.click();
-  });
+  importBtn.addEventListener("click",()=>{ backupFile.value=""; backupFile.click(); });
   backupFile.addEventListener("change",()=>{ if(backupFile.files.length) importSecure(backupFile.files[0]); });
 });
 </script>
