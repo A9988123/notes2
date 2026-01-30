@@ -101,22 +101,22 @@ async function exportSecure() {
   const password = prompt("請輸入密碼");
   if (!password) return;
 
-  try {
-    const notes = await getAll();
-    const jsonStr = JSON.stringify(notes);
-    const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
-    const blob = new Blob([encrypted], { type: "application/json" });
-    const file = new File([blob], "notes.secure.json", { type: "application/json" });
+  const notes = await getAll();
+  const jsonStr = JSON.stringify(notes);
 
-    // 桌機下載或手機分享
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
-      await navigator.share({ files: [file], title: "備忘錄匯出" });
-    } else {
-      downloadBlob(file, file.name);
-    }
-  } catch (err) {
-    console.error("匯出失敗:", err);
-    alert("❌ 匯出失敗，請重試");
+  // AES 加密 JSON → Base64 字串
+  const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
+  const encryptedBase64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(encrypted));
+
+  // 存成 JSON 檔案
+  const blob = new Blob([encryptedBase64], { type: "application/json" });
+  const file = new File([blob], "notes.secure.json", { type: "application/json" });
+
+  // 桌機下載 / 手機分享
+  if (navigator.canShare && navigator.canShare({ files: [file] }) && location.protocol !== "file:") {
+    await navigator.share({ files: [file], title: "備忘錄匯出" });
+  } else {
+    downloadBlob(file, file.name);
   }
 }
 
@@ -140,10 +140,13 @@ function importSecure(file) {
     try {
       let encrypted = e.target.result;
 
-      // 移除 BOM 或不可見字元，手機瀏覽器常自動加入 BOM
+      // 清理 BOM 或不可見字元（特別是在手機端）
       encrypted = encrypted.replace(/^\uFEFF/, "").trim();
 
-      const decrypted = CryptoJS.AES.decrypt(encrypted, password);
+      // 將 Base64 字串轉回原始加密資料
+      const base64Decoded = CryptoJS.enc.Base64.parse(encrypted).toString(CryptoJS.enc.Utf8);
+
+      const decrypted = CryptoJS.AES.decrypt(base64Decoded, password);
       const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
 
       if (!jsonStr) throw new Error("解密失敗");
