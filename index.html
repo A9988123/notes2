@@ -110,75 +110,68 @@ async function decryptBlobCryptoJS(data,password){
 }
 
 /* ================= exportSecure ================= */
+
 async function exportSecure(){
   const password = prompt("請輸入加密密碼");
   if(!password) return;
 
   try{
-    const zipBlob = await buildZipBlob();
-    const encryptedBlob = await encryptBlob(zipBlob,password);
-    const file = new File([encryptedBlob],"notes.secure.zip",{type:"application/octet-stream"});
+    const notes = await getAll();
+    // 將資料轉成 JSON
+    const jsonStr = JSON.stringify(notes);
+    // AES 加密 JSON
+    const encrypted = CryptoJS.AES.encrypt(jsonStr, password).toString();
+    const blob = new Blob([encrypted], {type:"application/octet-stream"});
+    const file = new File([blob], "notes.secure.json", {type:"application/octet-stream"});
 
     if(navigator.canShare && navigator.canShare({files:[file]}) && location.protocol!=="file:"){
-      await navigator.share({files:[file],title:"備忘錄匯出"});
-    } else downloadBlob(file,file.name);
+      await navigator.share({files:[file], title:"備忘錄匯出"});
+    } else {
+      downloadBlob(file, file.name);
+    }
   }catch(err){
     console.error(err);
     alert("❌ 匯出失敗");
   }
 }
 
-function downloadBlob(blob,filename){
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=filename;
+function downloadBlob(blob, filename){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   URL.revokeObjectURL(a.href);
   a.remove();
 }
 
+
 /* ================= importSecure ================= */
-function importSecure(file){
+async function importSecure(file){
   const password = prompt("請輸入加密密碼");
   if(!password) return;
 
   const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
+  reader.onload = async e => {
+    try{
       const encryptedText = e.target.result;
       const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
-      if(!decrypted.sigBytes || decrypted.sigBytes <= 0) throw new Error("解密失敗");
+      const jsonStr = decrypted.toString(CryptoJS.enc.Utf8);
+      if(!jsonStr) throw new Error("解密失敗或密碼錯誤");
 
-      // 將 WordArray 轉 Uint8Array
-      const words = decrypted.words;
-      const bytes = new Uint8Array(decrypted.sigBytes);
-      let offset = 0;
-      for(let i=0; i<words.length && offset<bytes.length; i++){
-        const w = words[i];
-        for(let b=3; b>=0 && offset<bytes.length; b--){
-          bytes[offset++] = (w >> (8*b)) & 0xff;
-        }
+      const notes = JSON.parse(jsonStr);
+      for(const note of notes){
+        save(note);
       }
-
-      const zipBlob = new Blob([bytes], {type: "application/zip"});
-      const zip = await JSZip.loadAsync(zipBlob);
-      const html = await zip.file("index.html").async("text");
-
-      const div = document.createElement("div");
-      div.innerHTML = html;
-      [...div.querySelectorAll("h2")].forEach((h,i)=>{
-        save({id:Date.now()+"_"+i, title:h.textContent, content:h.nextElementSibling?.innerHTML||"", timestamp:Date.now()});
-      });
 
       alert("✅ 匯入完成");
       refresh();
-    } catch(err) {
+    }catch(err){
       console.error(err);
-      alert("❌ 解密失敗或檔案損毀");
+      alert("❌ 匯入失敗：密碼錯誤或檔案已損毀");
     }
   };
-  reader.readAsText(file); // 使用 readAsText
+  reader.readAsText(file); // 手機/桌機都穩定
 }
 
 
