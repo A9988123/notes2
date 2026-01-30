@@ -112,9 +112,11 @@
 
   <input type="file" id="backupFile" accept=".secure.zip,.json" style="display:none">
 
- <!-- 只保留 CDN 連結，刪除本地引用 -->
+
+  <!-- 先引入 CryptoJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1-crypto-js.min.js"></script>
+  <!-- 然後引入 JSZip -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="./crypto-js.min.js"></script>
 
   <script>
     /* ================= IndexedDB ================= */
@@ -201,11 +203,10 @@
 
     /* ================= exportSecure ================= */
 async function exportSecure() {
-  // 檢查 JSZip 是否加載成功
-  if (typeof JSZip === "undefined") {
-    alert("❌ JSZip 沒有正確加載！");
-    return;
-  }
+// 檢查 CryptoJS 是否正確加載
+if (typeof CryptoJS === "undefined") {
+  alert("❌ CryptoJS 沒有正確加載！");
+  return;
 
 
   const password = prompt("請輸入加密密碼");
