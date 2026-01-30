@@ -1,40 +1,132 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>備忘錄</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>備忘錄</title>
+  <style>
+    body{
+      margin:0;
+      font-family:-apple-system,system-ui;
+      background:#f5f5f5;
+    }
+    header{
+      padding:14px;
+      font-size:22px;
+      font-weight:600;
+      display:flex;
+      justify-content:space-between;
+    }
+    #noteList{
+      padding:10px;
+    }
+    .note-item{
+      background:#fff;
+      border-radius:10px;
+      padding:12px;
+      margin-bottom:10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .note-title{
+      font-size:16px;
+      font-weight:500;
+    }
+    .note-sub{
+      font-size:12px;
+      color:#888;
+    }
+    .delete-btn {
+      background: #ff4d4d;
+      color: #fff;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    #fab{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      width:56px;
+      height:56px;
+      border-radius:50%;
+      background:#4a90e2;
+      color:#fff;
+      font-size:32px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    #editor{
+      position:fixed;
+      inset:0;
+      background:#f5f5f5;
+      display:none;
+      flex-direction:column;
+    }
+    #editorHeader{
+      background:#4a90e2;
+      color:#fff;
+      padding:10px;
+      display:flex;
+      justify-content:space-between;
+    }
+    #content{
+      flex:1;
+      padding:12px;
+      background:#fff;
+      margin:10px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      overflow:auto;
+    }
+    #topBar button{
+      margin-left:6px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header id="topBar">
+  <span>備忘錄</span>
+  <div>
+    <button id="exportBtn">加密匯出</button>
+    <button id="importBtn">匯入</button>
+    <button id="undoBtn" style="display:none"onclick="undoDeleteAll()">復原</button>
+    <button onclick="deleteAllNotes()">刪除所有備忘錄</button>
+    <button id="undoBtn" onclick="undoDeleteAll()" style="display:none">復原</button>
+  </div>
+</header>
+
+<div id="noteList"></div>
+<div id="fab" onclick="newNote()">＋</div>
+
+
+<div id="editor">
+  <div id="editorHeader">
+    <button onclick="closeEditor()">返回</button>
+    <button onclick="saveEditor()">存檔</button>
+  </div>
+  <div id="content" contenteditable="true"></div>
+</div>
+
+
+<input
+  type="file"
+  id="backupFile"
+  accept=".json,.secure"
+  style="display:none"
+/>
+
+<script src="./jszip.min.js"></script>
+<script src="./crypto-js.min.js"></script>
 
 <style>
-body{
-  margin:0;
-  font-family:-apple-system,system-ui;
-  background:#f5f5f5;
-}
-header{
-  padding:14px;
-  font-size:22px;
-  font-weight:600;
-  display:flex;
-  justify-content:space-between;
-}
-#noteList{
-  padding:10px;
-}
-.note-item{
-  background:#fff;
-  border-radius:10px;
-  padding:12px;
-  margin-bottom:10px;
-}
-.note-title{
-  font-size:16px;
-  font-weight:500;
-}
-.note-sub{
-  font-size:12px;
-  color:#888;
-}
+
 #fab{
   position:fixed;
   right:18px;
@@ -49,232 +141,216 @@ header{
   align-items:center;
   justify-content:center;
 }
-#editor{
-  position:fixed;
-  inset:0;
-  background:#f5f5f5;
-  display:none;
-  flex-direction:column;
-}
-#editorHeader{
-  background:#4a90e2;
-  color:#fff;
-  padding:10px;
-  display:flex;
-  justify-content:space-between;
-}
-#content{
-  flex:1;
-  padding:12px;
-  background:#fff;
-  margin:10px;
-  border-radius:10px;
-  border:1px solid #ccc;
-  overflow:auto;
-}
-#topBar button{
-  margin-left:6px;
-}
 </style>
-</head>
-
-<body>
-
-<header id="topBar">
-  <span>備忘錄</span>
-  <div>
-    <button onclick="exportSecure()">加密匯出</button>
-    <button onclick="backupFile.click()">匯入</button>
-  </div>
-</header>
-
-<div id="noteList"></div>
-<div id="fab" onclick="newNote()">＋</div>
-
-<!-- Editor -->
-<div id="editor">
-  <div id="editorHeader">
-    <button onclick="closeEditor()">返回</button>
-    <button onclick="saveEditor()">存檔</button>
-  </div>
-  <div id="content" contenteditable="true"></div>
-</div>
-
-<input type="file" id="backupFile" accept=".json" hidden />
-
-<script src="./jszip.min.js"></script>
-<script src="./crypto-js.min.js"></script>
 
 <script>
 /* ================= IndexedDB ================= */
 const DB_NAME = "memoDB";
 const STORE = "notes";
 let db = null;
-let currentId = null;
 
-function openDB(){
-  return new Promise((resolve,reject)=>{
-    const req = indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded = e=>{
-      const _db = e.target.result;
-      if(!_db.objectStoreNames.contains(STORE)){
-        _db.createObjectStore(STORE,{ keyPath:"id" });
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        d.createObjectStore(STORE, { keyPath: "id" });
       }
     };
-    req.onsuccess = e=>{
+    req.onsuccess = e => {
       db = e.target.result;
       resolve();
     };
-    req.onerror = e=>reject(e);
+    req.onerror = reject;
   });
 }
 
-function save(note){
-  const tx = db.transaction(STORE,"readwrite");
-  tx.objectStore(STORE).put(note);
+function save(note) {
+  db.transaction(STORE, "readwrite").objectStore(STORE).put(note);
 }
 
-function getAll(){
-  return new Promise(resolve=>{
-    const tx = db.transaction(STORE,"readonly");
-    const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = ()=>resolve(req.result||[]);
+function getAll() {
+  return new Promise(res => {
+    const r = db.transaction(STORE).objectStore(STORE).getAll();
+    r.onsuccess = () => res(r.result || []);
   });
 }
 
-function remove(id){
-  const tx = db.transaction(STORE,"readwrite");
+function removeAll() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function remove(id) {
+  const tx = db.transaction(STORE, "readwrite");
   tx.objectStore(STORE).delete(id);
 }
 
-/* ================= List ================= */
-async function refresh(){
-  const list = document.getElementById("noteList");
-  list.innerHTML = "";
-  const notes = await getAll();
-  notes
-    .sort((a,b)=>b.timestamp-a.timestamp)
-    .forEach(n=>{
-      const div = document.createElement("div");
-      div.className = "note-item";
-      div.innerHTML = `
-        <div class="note-title">${n.title||"（無標題）"}</div>
-        <div class="note-sub">${new Date(n.timestamp).toLocaleString()}</div>
-      `;
-      div.onclick = ()=>openEditor(n.id);
-      list.appendChild(div);
-    });
+/* ================= 確保 exportSecure 是全域 function ================= */
+
+async function exportSecure() {
+  console.log("📤 exportSecure called");
+
+  try {
+    console.log("1️⃣ build zip");
+    const zipBlob = await buildZipBlob();
+
+    const password = prompt("請輸入加密密碼");
+    if (!password) return;
+
+    console.log("2️⃣ encrypt");
+    const encryptedBlob = await encryptBlob(zipBlob, password);
+
+    console.log("3️⃣ done", encryptedBlob);
+
+    // ✅ 下載
+    downloadBlob(encryptedBlob, "notes.secure");
+
+    alert("✅ 匯出完成");
+
+  } catch (err) {
+    console.error("❌ export error:", err);
+    alert("❌ 匯出失敗：" + (err.message || err));
+  }
 }
 
-/* ================= Editor ================= */
-async function openEditor(id){
-  currentId = id;
-  const notes = await getAll();
-  const note = notes.find(n=>n.id===id);
-  content.innerHTML = note?.content || "";
-  editor.style.display = "flex";
-  noteList.style.display = "none";
-  fab.style.display = "none";
-}
 
-function closeEditor(){
-  editor.style.display = "none";
-  noteList.style.display = "";
-  fab.style.display = "";
-  currentId = null;
-  refresh();
-}
 
-function saveEditor(){
-  const text = content.innerText.trim();
-  save({
-    id: currentId || Date.now().toString(),
-    title: text.slice(0,20),
-    content: content.innerHTML,
-    encrypted:false,
-    timestamp: Date.now()
-  });
-  closeEditor();
-}
 
-function newNote(){
-  currentId = null;
-  content.innerHTML = "";
-  openEditor(null);
-}
-
-/* ================= Import ================= */
-backupFile.onchange = e=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = async ()=>{
-    const data = JSON.parse(reader.result);
-    if(!Array.isArray(data)){
-      alert("格式錯誤");
-      return;
-    }
-    data.forEach(n=>{
-      save({
-        ...n,
-        id: Date.now().toString()+Math.random().toString(36).slice(2)
-      });
-    });
-    refresh();
-    alert("匯入完成");
-  };
-  reader.readAsText(file);
-}
-
-/* ================= Utilities ================= */
-function downloadBlob(blob, filename){
+function downloadBlob(blob, filename) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
   URL.revokeObjectURL(a.href);
+  a.remove();
 }
 
-function canUseWebCrypto(){
-  return (
-    location.protocol === "https:" ||
-    location.hostname === "localhost"
-  ) && !!window.crypto?.subtle;
-}
-
-/* ================= Build ZIP ================= */
-async function buildZipBlob(){
+async function buildZipBlob() {
   const zip = new JSZip();
   const notes = await getAll();
 
-  let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>備忘錄</title></head><body>`;
+  let html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>備忘錄</title>
+</head>
+<body>
+`;
 
-  for (const n of notes){
-    const div = document.createElement("div");
-    div.innerHTML = n.content;
-
-    for (const media of div.querySelectorAll("img,video")){
-      if (!media.src.startsWith("data:")) continue;
-      const res = await fetch(media.src);
-      const blob = await res.blob();
-      const ext = blob.type.split("/")[1];
-      const name = `media/${crypto.randomUUID()}.${ext}`;
-      zip.file(name, blob);
-      media.src = name;
-    }
-
-    html += `<h2>${n.title}</h2>${div.innerHTML}<hr>`;
+  for (const n of notes) {
+    html += `<h2>${n.title || "（無標題）"}</h2>`;
+    html += `<div>${n.content || ""}</div><hr>`;
   }
 
   html += "</body></html>";
+
   zip.file("index.html", html);
-  return zip.generateAsync({ type:"blob" });
+  return zip.generateAsync({ type: "blob" });
 }
 
-/* ================= 加密 ================= */
-async function encryptBlobWebCrypto(blob,password){
+/* ================= iOS 穩定 prompt（你之前已經用過） ================= */
+
+function safePrompt(msg) {
+  return new Promise(res => {
+    setTimeout(() => res(prompt(msg)), 50);
+  });
+}
+
+/* ================= 匯入解密 ================= */
+function canUseWebCrypto() {
+  return location.protocol === "https:" && crypto?.subtle;
+}
+
+async function decryptBlobWebCrypto(data, password) {
+  const salt = data.slice(0, 16);
+  const iv = data.slice(16, 28);
+  const body = data.slice(28);
+
+  const keyMat = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+    keyMat,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  const buf = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    body
+  );
+
+  return new Blob([buf], { type: "application/zip" });
+}
+
+
+/* ================= importSecure ================= */
+
+async function importSecure(file) {
+  console.log("🔥 importSecure", file.name);
+
+  const password = prompt("請輸入加密密碼");
+  if (!password) return;
+
+  const data = new Uint8Array(await file.arrayBuffer());
+  let zipBlob;
+
+  try {
+    // 先試 WebCrypto（新版）
+    zipBlob = await decryptBlobWebCrypto(data, password);
+  } catch (e1) {
+    try {
+      // 再試 CryptoJS（舊版）
+      zipBlob = await decryptBlobCryptoJS(data, password);
+    } catch (e2) {
+      console.error(e1, e2);
+      alert("❌ 解密失敗：密碼錯誤或檔案已損毀");
+      return;
+    }
+  }
+
+  const zip = await JSZip.loadAsync(zipBlob);
+  const html = await zip.file("index.html").async("text");
+
+  const div = document.createElement("div");
+  div.innerHTML = html;
+
+  [...div.querySelectorAll("h2")].forEach((h, i) => {
+    save({
+      id: Date.now() + "_" + i,
+      title: h.textContent,
+      content: h.nextElementSibling?.innerHTML || "",
+      timestamp: Date.now()
+    });
+  });
+
+  alert("✅ 匯入完成");
+  refresh();
+}
+
+/* ================= 最穩定版本，先別分 fallback ================= */
+
+async function encryptBlob(blob, password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
+
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -282,76 +358,201 @@ async function encryptBlobWebCrypto(blob,password){
     false,
     ["deriveKey"]
   );
+
   const key = await crypto.subtle.deriveKey(
-    { name:"PBKDF2", salt, iterations:100000, hash:"SHA-256" },
+    { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
     keyMaterial,
-    { name:"AES-GCM", length:256 },
+    { name: "AES-GCM", length: 256 },
     false,
     ["encrypt"]
   );
+
   const encrypted = await crypto.subtle.encrypt(
-    { name:"AES-GCM", iv },
+    { name: "AES-GCM", iv },
     key,
     await blob.arrayBuffer()
   );
-  return new Blob([salt,iv,new Uint8Array(encrypted)],{ type:"application/octet-stream" });
+
+  return new Blob([salt, iv, new Uint8Array(encrypted)], {
+    type: "application/octet-stream"
+  });
 }
 
-async function encryptBlobFallback(blob,password){
-  const buf = await blob.arrayBuffer();
-  const wordArray = CryptoJS.lib.WordArray.create(buf);
-  const encrypted = CryptoJS.AES.encrypt(wordArray,password).toString();
-  return new Blob([encrypted],{ type:"application/octet-stream" });
+
+/* ================= newNote ================= */
+
+function newNote() {
+  currentId = null;
+  content.innerHTML = "";
+  openEditor(null);
 }
 
-async function encryptBlob(blob,password){
-  if(canUseWebCrypto()){
-    return encryptBlobWebCrypto(blob,password);
-  } else {
-    return encryptBlobFallback(blob,password);
+/* ================= 請直接加入這個 CryptoJS 解密函式 ================= */
+
+async function decryptBlobCryptoJS(data, password) {
+  const text = new TextDecoder().decode(data);
+  const decrypted = CryptoJS.AES.decrypt(text, password);
+
+  if (!decrypted.sigBytes || decrypted.sigBytes <= 0) {
+    throw new Error("CryptoJS decrypt failed");
   }
-}
 
-/* ================= Export Secure ================= */
-async function exportSecure(){
-  try {
-    const password = prompt("請輸入加密密碼");
-    if(!password) return;
+  const words = decrypted.words;
+  const bytes = new Uint8Array(decrypted.sigBytes);
 
-    const zipBlob = await buildZipBlob();
-    const encryptedBlob = await encryptBlob(zipBlob,password);
-    const file = new File([encryptedBlob],"notes.secure",{ type:"application/octet-stream" });
-
-    // iOS PWA / LocalSend 自動分享
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && !isFileProtocol) {
-      await navigator.share({ files: [file], title: "備忘錄匯出" });
-    } else if (location.protocol !== "file:") {
-      // 直接打開 LocalSend 分享頁面
-      const fileURL = URL.createObjectURL(file);
-      const sendURL = `https://localsend.example.com/send?file=${encodeURIComponent(fileURL)}`;
-      window.location.href = sendURL; // 使用 window.location.href 來直接觸發下載或分享
-    } else {
-      downloadBlob(file, file.name);
-      alert("file:// 模式已下載備份，請透過瀏覽器或 PWA 使用 LocalSend 分享");
+  let offset = 0;
+  for (let i = 0; i < words.length && offset < bytes.length; i++) {
+    const w = words[i];
+    for (let b = 3; b >= 0 && offset < bytes.length; b--) {
+      bytes[offset++] = (w >> (8 * b)) & 0xff;
     }
-
-  } catch (e) {
-    console.error(e);
-    alert("❌ 匯出失敗，請查看 Console");
   }
+
+  return new Blob([bytes], { type: "application/zip" });
 }
 
-/* ================= Init ================= */
-const isFileProtocol = location.protocol==="file:";
-if(isFileProtocol){
-  console.warn("目前為 file://，已自動停用 Service Worker / 分享限制");
+/* =================補回「完整可用的 refresh()」⭐⭐⭐================= */
+
+async function refresh() {
+  const list = document.getElementById("noteList");
+  list.innerHTML = "";
+
+  const notes = await getAll();
+
+  notes
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .forEach(note => {
+      const div = document.createElement("div");
+      div.className = "note-item";
+
+      div.innerHTML = `
+        <div>
+          <div class="note-title">${note.title || "（無標題）"}</div>
+          <div class="note-sub">${new Date(note.timestamp).toLocaleString()}</div>
+        </div>
+        <button class="delete-btn">刪除</button>
+      `;
+
+      // 點整張卡片 → 編輯
+      div.onclick = () => openEditor(note.id);
+
+      // 點刪除 → 只刪除，不進編輯
+      div.querySelector(".delete-btn").onclick = e => {
+        e.stopPropagation();
+        if (confirm("確定刪除此備忘錄？")) {
+          remove(note.id);
+          refresh();
+        }
+      };
+
+      list.appendChild(div);
+    });
 }
+
+/* =================刪除全部（含 undo 基礎）==👉 這樣才是**「提示 + 實際操作」完整 UX**=========== */
+
+let lastDeletedNotes = null;
+let undoTimer = null;
+
+async function deleteAllNotes() {
+  if (!confirm("⚠️ 確定刪除所有備忘錄？")) return;
+
+  lastDeletedNotes = await getAll();
+
+  await removeAll();        // 🔴 一定要 await
+  refresh();
+
+  const undoBtn = document.getElementById("undoBtn");
+  undoBtn.style.display = "inline-block";
+
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    lastDeletedNotes = null;
+    undoBtn.style.display = "none";
+  }, 10000);
+
+  alert("🧹 已刪除，可於 10 秒內復原");
+}
+
+/* =================undoDeleteAll() 也要確保順序正確 ================= */
+
+async function undoDeleteAll() {
+  if (!lastDeletedNotes || !lastDeletedNotes.length) return;
+
+  for (const note of lastDeletedNotes) {
+    await save(note);   // 若 save 不是 async，也 OK
+  }
+
+  lastDeletedNotes = null;
+  document.getElementById("undoBtn").style.display = "none";
+  refresh();
+
+  alert("↩️ 已復原");
+}
+
+/* =================補齊 Editor JS（你可以直接貼） ================= */
+
+let currentId = null;
+
+async function openEditor(id) {
+  currentId = id;
+  const notes = await getAll();
+  const note = notes.find(n => n.id === id);
+
+  document.getElementById("content").innerHTML = note?.content || "";
+  document.getElementById("editor").style.display = "flex";
+  document.getElementById("noteList").style.display = "none";
+  document.getElementById("fab").style.display = "none";
+}
+
+function closeEditor() {
+  editor.style.display = "none";
+  noteList.style.display = "";
+  fab.style.display = "";
+  currentId = null;
+  refresh();
+}
+
+function saveEditor() {
+  const text = content.innerText.trim();
+
+  save({
+    id: currentId || Date.now().toString(),
+    title: text.slice(0, 20),
+    content: content.innerHTML,
+    timestamp: Date.now()
+  });
+
+  closeEditor(); // closeEditor 裡 refresh 一次就好
+}
+
+/* ================= 啟動 ================= */
 
 window.addEventListener("load", async () => {
+  console.log("✅ app load");
+
   await openDB();
   refresh();
+
+  document.getElementById("exportBtn").addEventListener("click", exportSecure);
+
+  const importBtn = document.getElementById("importBtn");
+  const backupFile = document.getElementById("backupFile");
+
+  importBtn.addEventListener("click", () => {
+    backupFile.value = "";
+    backupFile.click();
+  });
+
+  backupFile.addEventListener("change", () => {
+    if (backupFile.files.length) {
+      importSecure(backupFile.files[0]);
+    }
+  });
 });
+
 </script>
+
 
 </body>
 </html>
