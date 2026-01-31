@@ -66,6 +66,29 @@ header {
     border-radius: 10px;
     border: 1px solid #ccc;
 }
+
+<div id="exportPanel" style="
+    position:fixed;
+    inset:0;
+    background:#f5f5f5;
+    display:none;
+    flex-direction:column;
+    z-index:9999;
+">
+    <div style="padding:10px;background:#4a90e2;color:#fff;">
+        <button onclick="closeExport()">返回</button>
+        <span style="margin-left:10px;">加密匯出</span>
+    </div>
+
+    <p style="padding:10px;">
+        請「全選 → 複製」，另存成 <b>notes.simple.txt</b>
+    </p>
+
+    <textarea id="exportText"
+        style="flex:1;margin:10px;border-radius:8px;"></textarea>
+</div>
+
+
 </style>
 </head>
 
@@ -176,6 +199,12 @@ async function decryptBlobCryptoJS(blob, password) {
     return new Blob([bytes], { type: "application/zip" });
 }
 
+/* ================= 加一個關閉函式 ================= */
+
+function closeExport() {
+    document.getElementById("exportPanel").style.display = "none";
+}
+
 /* ================= 匯出 ================= */
 async function exportSecure() {
     const pwd = prompt("請輸入密碼");
@@ -185,17 +214,10 @@ async function exportSecure() {
     const json = JSON.stringify(notes);
     const encrypted = simpleEncrypt(json, pwd);
 
-    // 建立可顯示的頁面（手機友善）
-    const w = window.open("");
-    w.document.write(`
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <h3>加密備份內容</h3>
-        <p>請「全選 → 複製 → 存成 notes.simple.txt」</p>
-        <textarea style="width:100%;height:60vh;">${encrypted}</textarea>
-    `);
+    // 顯示在同頁（手機安全）
+    document.getElementById("exportText").value = encrypted;
+    document.getElementById("exportPanel").style.display = "flex";
 }
-
-
 
 /* ================= 匯入 ================= */
 async function importSecure(file) {
