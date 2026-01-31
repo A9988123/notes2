@@ -140,6 +140,18 @@ header {
 </div>
 
 <script>
+// DOM references（手機一定要）
+const roomList   = document.getElementById("roomList");
+const fab        = document.getElementById("fab");
+const chatView   = document.getElementById("chatView");
+const chatTitle  = document.getElementById("chatTitle");
+const chatMessages = document.getElementById("chatMessages");
+const msgInput   = document.getElementById("msgInput");
+
+const addPanel   = document.getElementById("addPanel");
+const peerInput  = document.getElementById("peerInput");
+
+
 /* 身分 */
 const myId = localStorage.userId || (
   localStorage.userId = crypto.randomUUID()
@@ -173,6 +185,7 @@ function closeAdd() {
   addPanel.style.display = "none";
 }
 function confirmAdd() {
+alert("建立被點擊");
   const peerId = peerInput.value.trim();
   if (!peerId) return alert("請輸入 userId");
 
