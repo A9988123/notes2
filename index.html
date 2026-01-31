@@ -176,14 +176,27 @@ async function confirmExport() {
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-    if (isIOS) {
-        // iOS: 新分頁顯示內容，提示使用者分享/儲存
-        exportPanel.style.display = "flex";
-        exportText.value = encrypted;
-        exportText.select();
-        exportText.setSelectionRange(0, encrypted.length);
-        alert("📄 請點右上分享按鈕 → 儲存到檔案，完成備份");
-    } else {
+    if (navigator.share && isIOS) {
+        // iOS 且支援 Web Share API: 直接呼叫分享
+        try {
+            const blob = new Blob([encrypted], { type: "text/plain" });
+            const file = new File([blob], "notes.simple.txt", { type: "text/plain" });
+            await navigator.share({
+                files: [file],
+                title: "備份加密檔",
+                text: "請妥善保存此檔案"
+            });
+            alert("✅ 分享成功，請存到檔案或雲端");
+        } catch (err) {
+            console.error(err);
+            // 如果分享失敗 fallback 到 textarea
+            exportPanel.style.display = "flex";
+            exportText.value = encrypted;
+            exportText.select();
+            exportText.setSelectionRange(0, encrypted.length);
+            alert("📄 分享失敗，請手動複製文字備份");
+        }
+    } else if (!isIOS) {
         // Android / 桌機: 自動下載
         const blob = new Blob([encrypted], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
@@ -195,8 +208,16 @@ async function confirmExport() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         alert("✅ 加密檔已下載");
+    } else {
+        // iOS 不支援 Web Share API: fallback 到 textarea
+        exportPanel.style.display = "flex";
+        exportText.value = encrypted;
+        exportText.select();
+        exportText.setSelectionRange(0, encrypted.length);
+        alert("📄 請長按複製文字 → 儲存到檔案，完成備份");
     }
 }
+
 
 
 /* 匯入 */
