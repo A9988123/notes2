@@ -119,7 +119,8 @@ const myId = localStorage.userId || (
 );
 
 /* WebSocket */
-const ws = new WebSocket("ws://localhost:3000");
+//const ws = new WebSocket("ws://localhost:3000");
+  const ws = new WebSocket("ws://192.168.0.13:3000");
 ws.onopen = () => {
   ws.send(JSON.stringify({ type: "register", userId: myId }));
 };
