@@ -168,21 +168,36 @@ function openExport() {
 async function confirmExport() {
     const pwd = passwordInput.value;
     if (!pwd) return alert("請輸入密碼");
+
     const notes = await getAll();
     const encrypted = simpleEncrypt(JSON.stringify(notes), pwd);
 
-    // 下載檔案（手機友善）
-    const blob = new Blob([encrypted], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "notes.simple.txt";
-    a.click();
-    URL.revokeObjectURL(a.href);
-
-    exportText.value = encrypted;
     passwordPanel.style.display = "none";
-    exportPanel.style.display = "flex";
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    if (isIOS) {
+        // iOS: 新分頁顯示內容，提示使用者分享/儲存
+        exportPanel.style.display = "flex";
+        exportText.value = encrypted;
+        exportText.select();
+        exportText.setSelectionRange(0, encrypted.length);
+        alert("📄 請點右上分享按鈕 → 儲存到檔案，完成備份");
+    } else {
+        // Android / 桌機: 自動下載
+        const blob = new Blob([encrypted], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "notes.simple.txt";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert("✅ 加密檔已下載");
+    }
 }
+
 
 /* 匯入 */
 function openImport(file) {
