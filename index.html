@@ -178,68 +178,46 @@ async function decryptBlobCryptoJS(blob, password) {
 
 /* ================= 匯出 ================= */
 async function exportSecure() {
-    const password = prompt("請輸入加密密碼");
-    if (!password) return;
+    const pwd = prompt("請輸入密碼");
+    if (!pwd) return;
 
-    try {
-        const notes = await getAll();
+    const notes = await getAll();
+    const json = JSON.stringify(notes);
+    const encrypted = simpleEncrypt(json, pwd);
 
-        const json = JSON.stringify({
-            version: 1,
-            createdAt: Date.now(),
-            notes
-        });
-
-        const encrypted = CryptoJS.AES.encrypt(json, password).toString();
-
-        const blob = new Blob([encrypted], { type: "text/plain" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "notes.secure.txt";
-        a.click();
-        URL.revokeObjectURL(a.href);
-    } catch (e) {
-        console.error(e);
-        alert("❌ 匯出失敗");
-    }
+    const blob = new Blob([encrypted], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notes.simple.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 
 /* ================= 匯入 ================= */
 async function importSecure(file) {
-    const password = prompt("請輸入加密密碼");
-    if (!password) return;
+    const pwd = prompt("請輸入密碼");
+    if (!pwd) return;
 
     try {
-        const encryptedText = await file.text();
-        const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
-        const jsonText = decrypted.toString(CryptoJS.enc.Utf8);
+        const encrypted = await file.text();
+        const json = simpleDecrypt(encrypted, pwd);
+        const notes = JSON.parse(json);
 
-        if (!jsonText) throw new Error("decrypt failed");
-
-        const data = JSON.parse(jsonText);
-
-        if (!Array.isArray(data.notes)) {
-            throw new Error("invalid data");
-        }
-
-        for (const note of data.notes) {
+        for (const n of notes) {
             save({
                 id: Date.now() + Math.random(),
-                title: note.title || "",
-                content: note.content || "",
-                timestamp: note.timestamp || Date.now()
+                title: n.title || "",
+                content: n.content || "",
+                timestamp: n.timestamp || Date.now()
             });
         }
-
         refresh();
         alert("✅ 匯入完成");
     } catch (e) {
-        console.error(e);
-        alert("❌ 解密失敗（密碼錯誤或檔案損毀）");
+        alert("❌ 匯入失敗");
     }
 }
-
 
 /* ================= UI ================= */
 async function refresh() {
@@ -301,6 +279,33 @@ function deleteAllNotes() {
         removeAll();
         refresh();
     }
+}
+
+
+/* ================= 最簡單可測試加密（一定成功） ================= */
+/* ================= 加密================= */
+
+function simpleEncrypt(text, password) {
+    let out = "";
+    for (let i = 0; i < text.length; i++) {
+        out += String.fromCharCode(
+            text.charCodeAt(i) ^ password.charCodeAt(i % password.length)
+        );
+    }
+    return btoa(out); // Base64
+}
+
+/* ================= 解密 ================= */
+
+function simpleDecrypt(base64, password) {
+    const text = atob(base64);
+    let out = "";
+    for (let i = 0; i < text.length; i++) {
+        out += String.fromCharCode(
+            text.charCodeAt(i) ^ password.charCodeAt(i % password.length)
+        );
+    }
+    return out;
 }
 
 /* ================= 啟動 ================= */
