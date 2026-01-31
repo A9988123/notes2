@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>私密即時聊天</title>
-
 <style>
 body { margin:0; font-family:-apple-system, system-ui; background:#f5f5f5; }
 header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; }
@@ -28,7 +27,6 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
 #addPanel { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; z-index:9999; }
 </style>
 </head>
-
 <body>
 
 <header>聊天（即時）</header>
@@ -46,9 +44,7 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
     <input id="peerInput" placeholder="輸入對方 userId"
       style="width:100%; font-size:16px; padding:10px;">
     <button onclick="confirmAdd()"
-      style="margin-top:15px; width:100%; padding:12px;">
-      建立
-    </button>
+      style="margin-top:15px; width:100%; padding:12px;">建立</button>
   </div>
 </div>
 
@@ -101,27 +97,21 @@ const store = (s, m="readonly") => db.transaction(s, m).objectStore(s);
 function openAdd() { addPanel.style.display="flex"; peerInput.value=""; }
 function closeAdd() { addPanel.style.display="none"; }
 function confirmAdd() {
+  console.log("confirmAdd 被呼叫"); // <- debug
   const peerId = peerInput.value.trim();
   if (!peerId) return alert("請輸入 userId");
 
   const roomId = [myId, peerId].sort().join("_");
   const room = { id: roomId, peerId, title: peerId.slice(0,8), updated: Date.now() };
 
-  // 建立 transaction，等成功後再刷新
+  // Transaction with oncomplete
   const tx = db.transaction("rooms", "readwrite");
   const storeRooms = tx.objectStore("rooms");
   const req = storeRooms.put(room);
 
-  req.onsuccess = () => {
-    tx.oncomplete = () => {  // 保證 transaction 完全完成才關閉
-      closeAdd();
-      refreshRooms();
-    };
-  };
-
-  req.onerror = e => alert("建立失敗，請重試");
+  req.onerror = e => { alert("建立失敗，請重試"); console.error(e); };
+  tx.oncomplete = () => { closeAdd(); refreshRooms(); };
 }
-
 
 /* Rooms */
 function refreshRooms() {
@@ -198,6 +188,5 @@ window.onload = async ()=>{
   console.log("你的 userId：", myId);
 };
 </script>
-
 </body>
 </html>
