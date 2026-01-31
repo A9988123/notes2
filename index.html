@@ -185,13 +185,16 @@ async function exportSecure() {
     const json = JSON.stringify(notes);
     const encrypted = simpleEncrypt(json, pwd);
 
-    const blob = new Blob([encrypted], { type: "text/plain" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "notes.simple.txt";
-    a.click();
-    URL.revokeObjectURL(a.href);
+    // 建立可顯示的頁面（手機友善）
+    const w = window.open("");
+    w.document.write(`
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <h3>加密備份內容</h3>
+        <p>請「全選 → 複製 → 存成 notes.simple.txt」</p>
+        <textarea style="width:100%;height:60vh;">${encrypted}</textarea>
+    `);
 }
+
 
 
 /* ================= 匯入 ================= */
