@@ -178,15 +178,23 @@ async function decryptBlobCryptoJS(blob, password) {
 
 /* ================= 匯出 ================= */
 async function exportSecure() {
-    const pwd = prompt("請輸入加密密碼");
-    if (!pwd) return;
+    const password = prompt("請輸入加密密碼");
+    if (!password) return;
 
     try {
-        const zipBlob = await buildZipBlob();
-        const encryptedBlob = await encryptBlob(zipBlob, pwd);
+        const notes = await getAll();
 
+        const json = JSON.stringify({
+            version: 1,
+            createdAt: Date.now(),
+            notes
+        });
+
+        const encrypted = CryptoJS.AES.encrypt(json, password).toString();
+
+        const blob = new Blob([encrypted], { type: "text/plain" });
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(encryptedBlob);
+        a.href = URL.createObjectURL(blob);
         a.download = "notes.secure.txt";
         a.click();
         URL.revokeObjectURL(a.href);
@@ -196,27 +204,34 @@ async function exportSecure() {
     }
 }
 
+
 /* ================= 匯入 ================= */
 async function importSecure(file) {
-    const pwd = prompt("請輸入加密密碼");
-    if (!pwd) return;
+    const password = prompt("請輸入加密密碼");
+    if (!password) return;
 
     try {
-        const zipBlob = await decryptBlobCryptoJS(file, pwd);
-        const zip = await JSZip.loadAsync(zipBlob);
-        const html = await zip.file("index.html").async("text");
+        const encryptedText = await file.text();
+        const decrypted = CryptoJS.AES.decrypt(encryptedText, password);
+        const jsonText = decrypted.toString(CryptoJS.enc.Utf8);
 
-        const div = document.createElement("div");
-        div.innerHTML = html;
+        if (!jsonText) throw new Error("decrypt failed");
 
-        for (const h of div.querySelectorAll("h2")) {
+        const data = JSON.parse(jsonText);
+
+        if (!Array.isArray(data.notes)) {
+            throw new Error("invalid data");
+        }
+
+        for (const note of data.notes) {
             save({
                 id: Date.now() + Math.random(),
-                title: h.textContent,
-                content: h.nextElementSibling?.innerHTML || "",
-                timestamp: Date.now()
+                title: note.title || "",
+                content: note.content || "",
+                timestamp: note.timestamp || Date.now()
             });
         }
+
         refresh();
         alert("✅ 匯入完成");
     } catch (e) {
@@ -224,6 +239,7 @@ async function importSecure(file) {
         alert("❌ 解密失敗（密碼錯誤或檔案損毀）");
     }
 }
+
 
 /* ================= UI ================= */
 async function refresh() {
@@ -293,8 +309,13 @@ window.onload = async () => {
     refresh();
     exportBtn.onclick = exportSecure;
     importBtn.onclick = () => backupFile.click();
-    backupFile.onchange = () => backupFile.files[0] && importSecure(backupFile.files[0]);
+    backupFile.onchange = () => {
+        if (backupFile.files.length) {
+            importSecure(backupFile.files[0]);
+        }
+    };
 };
+
 </script>
 
 </body>
