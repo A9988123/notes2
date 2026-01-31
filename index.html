@@ -102,13 +102,26 @@ function openAdd() { addPanel.style.display="flex"; peerInput.value=""; }
 function closeAdd() { addPanel.style.display="none"; }
 function confirmAdd() {
   const peerId = peerInput.value.trim();
-  if(!peerId) return alert("請輸入 userId");
+  if (!peerId) return alert("請輸入 userId");
+
   const roomId = [myId, peerId].sort().join("_");
-  const room = { id:roomId, peerId, title:peerId.slice(0,8), updated:Date.now() };
-  const req = store("rooms","readwrite").put(room);
-  req.onsuccess = () => { closeAdd(); refreshRooms(); };
-  req.onerror = () => alert("建立失敗，請重試");
+  const room = { id: roomId, peerId, title: peerId.slice(0,8), updated: Date.now() };
+
+  // 建立 transaction，等成功後再刷新
+  const tx = db.transaction("rooms", "readwrite");
+  const storeRooms = tx.objectStore("rooms");
+  const req = storeRooms.put(room);
+
+  req.onsuccess = () => {
+    tx.oncomplete = () => {  // 保證 transaction 完全完成才關閉
+      closeAdd();
+      refreshRooms();
+    };
+  };
+
+  req.onerror = e => alert("建立失敗，請重試");
 }
+
 
 /* Rooms */
 function refreshRooms() {
