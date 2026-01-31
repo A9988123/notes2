@@ -90,6 +90,16 @@ header {
   border-radius: 18px;
   padding: 8px 12px;
 }
+
+/* Add room panel */
+#addPanel {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  display: none;
+  flex-direction: column;
+  z-index: 9999;
+}
 </style>
 </head>
 
@@ -98,8 +108,25 @@ header {
 <header>聊天（即時）</header>
 
 <div id="roomList"></div>
-<div id="fab" onclick="createRoom()">＋</div>
+<div id="fab" onclick="openAdd()">＋</div>
 
+<!-- 新增聊天室 -->
+<div id="addPanel">
+  <div style="padding:12px; background:#4a90e2; color:#fff;">
+    <button onclick="closeAdd()">←</button>
+    新增聊天室
+  </div>
+  <div style="padding:20px;">
+    <input id="peerInput" placeholder="輸入對方 userId"
+      style="width:100%; font-size:16px; padding:10px;">
+    <button onclick="confirmAdd()"
+      style="margin-top:15px; width:100%; padding:12px;">
+      建立
+    </button>
+  </div>
+</div>
+
+<!-- Chat -->
 <div id="chatView">
   <div id="chatHeader">
     <button onclick="closeChat()">←</button>
@@ -119,11 +146,8 @@ const myId = localStorage.userId || (
 );
 
 /* WebSocket */
-//const ws = new WebSocket("ws://localhost:3000");
-  const ws = new WebSocket("ws://192.168.0.13:3000");
-ws.onopen = () => {
-  ws.send(JSON.stringify({ type: "register", userId: myId }));
-};
+const ws = new WebSocket("ws://192.168.0.13:3000");
+ws.onopen = () => ws.send(JSON.stringify({ type: "register", userId: myId }));
 ws.onmessage = e => receiveMsg(JSON.parse(e.data));
 
 /* IndexedDB */
@@ -132,28 +156,41 @@ let db, currentRoom;
 const openDB = () => new Promise(res => {
   const req = indexedDB.open("chatDB", 1);
   req.onupgradeneeded = e => {
-    const db = e.target.result;
-    db.createObjectStore("rooms", { keyPath: "id" });
-    db.createObjectStore("messages", { keyPath: "id" });
+    const d = e.target.result;
+    d.createObjectStore("rooms", { keyPath: "id" });
+    d.createObjectStore("messages", { keyPath: "id" });
   };
   req.onsuccess = e => { db = e.target.result; res(); };
 });
 const store = (s, m="readonly") => db.transaction(s, m).objectStore(s);
 
-/* Rooms */
-function createRoom() {
-  const peerId = prompt("輸入對方 userId");
-  if (!peerId) return;
+/* 新增聊天室 */
+function openAdd() {
+  addPanel.style.display = "flex";
+  peerInput.value = "";
+}
+function closeAdd() {
+  addPanel.style.display = "none";
+}
+function confirmAdd() {
+  const peerId = peerInput.value.trim();
+  if (!peerId) return alert("請輸入 userId");
+
+  const roomId = [myId, peerId].sort().join("_");
+
   const room = {
-    id: "room-" + Date.now(),
+    id: roomId,
     peerId,
     title: peerId.slice(0,8),
     updated: Date.now()
   };
+
   store("rooms","readwrite").put(room);
+  closeAdd();
   refreshRooms();
 }
 
+/* Rooms */
 function refreshRooms() {
   roomList.innerHTML = "";
   store("rooms").getAll().onsuccess = e => {
@@ -185,12 +222,12 @@ function closeChat() {
 }
 
 function sendMsg() {
-  const text = msgInput.innerHTML.trim();
+  const text = msgInput.innerText.trim();
   if (!text) return;
 
   const msg = {
     type: "message",
-    id: Date.now(),
+    id: crypto.randomUUID(),
     roomId: currentRoom.id,
     from: myId,
     to: currentRoom.peerId,
@@ -206,6 +243,20 @@ function sendMsg() {
 
 function receiveMsg(msg) {
   store("messages","readwrite").put(msg);
+
+  // 若聊天室不存在，自動建立
+  store("rooms").get(msg.roomId).onsuccess = e => {
+    if (!e.target.result) {
+      store("rooms","readwrite").put({
+        id: msg.roomId,
+        peerId: msg.from,
+        title: msg.from.slice(0,8),
+        updated: Date.now()
+      });
+      refreshRooms();
+    }
+  };
+
   if (currentRoom && msg.roomId === currentRoom.id) {
     renderMessages();
   }
