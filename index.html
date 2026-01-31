@@ -161,7 +161,7 @@ header {
   </div>
   <div style="padding:20px;">
     <input id="peerInput" placeholder="輸入對方 userId">
-    <button onclick="confirmAdd()">建立</button>
+    <button id="addRoomBtn">建立</button>
   </div>
 </div>
 
@@ -193,6 +193,15 @@ header {
 </div>
 
 <script>
+/* DOM */
+const addPanel = document.getElementById("addPanel");
+const peerInput = document.getElementById("peerInput");
+const mainHeader = document.getElementById("mainHeader");
+const exportPanel = document.getElementById("exportPanel");
+const exportText = document.getElementById("exportText");
+const passwordPanel = document.getElementById("passwordPanel");
+const exportPassword = document.getElementById("exportPassword");
+
 /* 身分 */
 const myId = localStorage.userId || (localStorage.userId = crypto.randomUUID());
 
@@ -204,55 +213,61 @@ ws.onmessage = e => receiveMsg(JSON.parse(e.data));
 /* IndexedDB */
 let db, currentRoom;
 const openDB = () => new Promise(res => {
-  const req = indexedDB.open("chatDB", 1);
+  const req = indexedDB.open("chatDB",1);
   req.onupgradeneeded = e => {
     const d = e.target.result;
-    if(!d.objectStoreNames.contains("rooms")) d.createObjectStore("rooms", { keyPath: "id" });
-    if(!d.objectStoreNames.contains("messages")) d.createObjectStore("messages", { keyPath: "id" });
+    if(!d.objectStoreNames.contains("rooms")) d.createObjectStore("rooms",{keyPath:"id"});
+    if(!d.objectStoreNames.contains("messages")) d.createObjectStore("messages",{keyPath:"id"});
   };
   req.onsuccess = e => { db = e.target.result; res(); };
 });
-const store = (s, m="readonly") => db.transaction(s, m).objectStore(s);
+const store = (s,m="readonly") => db.transaction(s,m).objectStore(s);
 
 /* 新增聊天室 */
-function openAdd() { addPanel.style.display = "flex"; peerInput.value=""; }
-function closeAdd() { addPanel.style.display = "none"; }
-function confirmAdd() {
+function openAdd(){ addPanel.style.display="flex"; peerInput.value=""; }
+function closeAdd(){ addPanel.style.display="none"; }
+function confirmAdd(){
   const peerId = peerInput.value.trim();
   if(!peerId) return alert("請輸入 userId");
   const roomId = [myId, peerId].sort().join("_");
   const room = { id: roomId, peerId, title: peerId.slice(0,8), updated: Date.now() };
   const req = store("rooms","readwrite").put(room);
   req.onsuccess = () => { closeAdd(); refreshRooms(); };
+  req.onerror = e => alert("新增聊天室失敗：" + e.target.error);
 }
+/* 綁定手機點擊 */
+document.getElementById("addRoomBtn").addEventListener("click", confirmAdd);
 
 /* Rooms */
-function refreshRooms() {
+function refreshRooms(){
   roomList.innerHTML="";
-  const req = store("rooms").getAll();
-  req.onsuccess = e => {
-    e.target.result.sort((a,b)=>b.updated - a.updated).forEach(r=>{
+  store("rooms").getAll().onsuccess = e => {
+    e.target.result.sort((a,b)=>b.updated-a.updated).forEach(r=>{
       const d = document.createElement("div");
-      d.className = "room";
+      d.className="room";
       d.innerHTML = `<div class="room-title">${r.title}</div>
                      <div class="room-sub">${new Date(r.updated).toLocaleString()}</div>`;
-      d.onclick = () => openChat(r);
+      d.onclick = ()=>openChat(r);
       roomList.appendChild(d);
     });
   };
 }
 
 /* Chat */
-function openChat(room) {
+function openChat(room){
   currentRoom = room;
   chatTitle.textContent = room.title;
   chatView.style.display="flex";
-  roomList.style.display = fab.style.display = "none";
+  roomList.style.display = fab.style.display="none";
   renderMessages();
 }
-function closeChat() { chatView.style.display="none"; roomList.style.display = fab.style.display=""; refreshRooms(); }
+function closeChat(){
+  chatView.style.display="none";
+  roomList.style.display = fab.style.display="";
+  refreshRooms();
+}
 
-function sendMsg() {
+function sendMsg(){
   const text = msgInput.innerText.trim();
   if(!text) return;
   const msg = {
@@ -270,7 +285,7 @@ function sendMsg() {
   renderMessages();
 }
 
-function receiveMsg(msg) {
+function receiveMsg(msg){
   store("messages","readwrite").put(msg);
   store("rooms").get(msg.roomId).onsuccess = e=>{
     if(!e.target.result){
@@ -286,42 +301,41 @@ function receiveMsg(msg) {
   if(currentRoom && msg.roomId===currentRoom.id) renderMessages();
 }
 
-function renderMessages() {
+function renderMessages(){
   chatMessages.innerHTML="";
-  store("messages").getAll().onsuccess = e=>{
+  store("messages").getAll().onsuccess=e=>{
     e.target.result.filter(m=>m.roomId===currentRoom.id)
       .sort((a,b)=>a.timestamp-b.timestamp)
       .forEach(m=>{
         const d = document.createElement("div");
-        d.className = "msg "+(m.from===myId?"me":"other");
-        d.textContent = m.content;
+        d.className="msg "+(m.from===myId?"me":"other");
+        d.textContent=m.content;
         chatMessages.appendChild(d);
       });
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    chatMessages.scrollTop=chatMessages.scrollHeight;
   };
 }
 
 /* 匯出流程 */
-function openExport() { passwordPanel.style.display="flex"; }
-function confirmPassword() {
+function openExport(){ passwordPanel.style.display="flex"; }
+function confirmPassword(){
   const pw = exportPassword.value;
-  if(pw==="1234"){ // 密碼驗證
+  if(pw==="1234"){
     exportPassword.value="";
     passwordPanel.style.display="none";
     store("messages").getAll().onsuccess=e=>{
       exportText.value=JSON.stringify(e.target.result,null,2);
       exportPanel.style.display="flex";
     };
-  } else alert("密碼錯誤");
+  }else alert("密碼錯誤");
 }
-function closeExport() { exportPanel.style.display="none"; }
+function closeExport(){ exportPanel.style.display="none"; }
 
 /* 開發用重置鍵 */
-function resetAll() {
+function resetAll(){
   indexedDB.deleteDatabase("chatDB");
   alert("資料已清除，請重新整理");
 }
-/* 長按 header 觸發 */
 let pressTimer;
 mainHeader.addEventListener("mousedown",()=>{ pressTimer=setTimeout(resetAll,2000); });
 mainHeader.addEventListener("touchstart",()=>{ pressTimer=setTimeout(resetAll,2000); });
