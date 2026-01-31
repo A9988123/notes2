@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>私密即時聊天</title>
+
 <style>
 body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5;}
-header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; user-select:none; }
+header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; user-select:none;}
 #roomList{padding:10px;}
-.room{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer;}
+.room{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;}
 .room-title{font-size:16px;font-weight:500;}
 .room-sub{font-size:12px;color:#888;}
 #fab{position:fixed;right:18px;bottom:18px;width:56px;height:56px;border-radius:50%;background:#4a90e2;color:#fff;font-size:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
@@ -28,6 +29,7 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
 .panel textarea{width:100%;height:60%;font-size:14px;}
 </style>
 </head>
+
 <body>
 
 <header id="mainHeader">聊天（即時）</header>
@@ -42,7 +44,7 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
   <button onclick="closeAdd()">取消</button>
 </div>
 
-<!-- 聊天視窗 -->
+<!-- Chat -->
 <div id="chatView">
   <div id="chatHeader">
     <button onclick="closeChat()">←</button>
@@ -90,9 +92,6 @@ ws.onopen = () => ws.send(JSON.stringify({type:"register",userId:myId}));
 ws.onmessage = e=>{
   const msg = JSON.parse(e.data);
   if(msg.type==="message") receiveMsg(msg);
-  else if(msg.type==="new_room"){
-    store("rooms","readwrite").put(msg.room).onsuccess=()=>refreshRooms();
-  }
 };
 
 /* IndexedDB */
@@ -119,7 +118,6 @@ function confirmAdd(){
   store("rooms","readwrite").put(room).onsuccess=()=>{
     closeAdd();
     refreshRooms();
-    ws.send(JSON.stringify({type:"new_room",room}));
   };
   store("rooms","readwrite").put(room).onerror=e=>alert("新增聊天室失敗："+e.target.error);
 }
