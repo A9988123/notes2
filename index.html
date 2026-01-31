@@ -41,10 +41,8 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
     新增聊天室
   </div>
   <div style="padding:20px;">
-    <input id="peerInput" placeholder="輸入對方 userId"
-      style="width:100%; font-size:16px; padding:10px;">
-    <button onclick="confirmAdd()"
-      style="margin-top:15px; width:100%; padding:12px;">建立</button>
+    <input id="peerInput" placeholder="輸入對方 userId" style="width:100%; font-size:16px; padding:10px;">
+    <button onclick="confirmAdd()" style="margin-top:15px; width:100%; padding:12px;">建立</button>
   </div>
 </div>
 
@@ -82,35 +80,49 @@ ws.onmessage = e => receiveMsg(JSON.parse(e.data));
 
 /* IndexedDB */
 let db, currentRoom;
-const openDB = () => new Promise(res => {
-  const req = indexedDB.open("chatDB", 1);
-  req.onupgradeneeded = e => {
-    const d = e.target.result;
-    d.createObjectStore("rooms", { keyPath: "id" });
-    d.createObjectStore("messages", { keyPath: "id" });
-  };
-  req.onsuccess = e => { db = e.target.result; res(); };
-});
+
+// 初始化 DB
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("chatDB", 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains("rooms")) d.createObjectStore("rooms", { keyPath: "id" });
+      if (!d.objectStoreNames.contains("messages")) d.createObjectStore("messages", { keyPath: "id" });
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(); };
+    req.onerror = e => { console.error("DB 開啟失敗", e); reject(e); };
+  });
+}
+
 const store = (s, m="readonly") => db.transaction(s, m).objectStore(s);
 
 /* 新增聊天室 */
 function openAdd() { addPanel.style.display="flex"; peerInput.value=""; }
 function closeAdd() { addPanel.style.display="none"; }
 function confirmAdd() {
-  console.log("confirmAdd 被呼叫"); // <- debug
+  if(!db) return alert("資料庫尚未初始化，請稍後再試");
+
   const peerId = peerInput.value.trim();
-  if (!peerId) return alert("請輸入 userId");
+  if(!peerId) return alert("請輸入對方 userId");
 
   const roomId = [myId, peerId].sort().join("_");
   const room = { id: roomId, peerId, title: peerId.slice(0,8), updated: Date.now() };
 
-  // Transaction with oncomplete
-  const tx = db.transaction("rooms", "readwrite");
-  const storeRooms = tx.objectStore("rooms");
-  const req = storeRooms.put(room);
-
-  req.onerror = e => { alert("建立失敗，請重試"); console.error(e); };
-  tx.oncomplete = () => { closeAdd(); refreshRooms(); };
+  try {
+    const tx = db.transaction("rooms", "readwrite");
+    const storeRooms = tx.objectStore("rooms");
+    storeRooms.put(room);
+    tx.oncomplete = () => {
+      closeAdd();
+      refreshRooms();
+      console.log("聊天室建立成功:", room);
+    };
+    tx.onerror = e => { alert("建立失敗"); console.error(e); };
+  } catch (err) {
+    alert("建立失敗，請稍後再試");
+    console.error(err);
+  }
 }
 
 /* Rooms */
@@ -156,9 +168,7 @@ function receiveMsg(msg) {
   store("messages","readwrite").put(msg);
   store("rooms").get(msg.roomId).onsuccess = e => {
     if(!e.target.result) {
-      store("rooms","readwrite").put({
-        id:msg.roomId, peerId:msg.from, title:msg.from.slice(0,8), updated:Date.now()
-      });
+      store("rooms","readwrite").put({ id:msg.roomId, peerId:msg.from, title:msg.from.slice(0,8), updated:Date.now() });
       refreshRooms();
     }
   };
@@ -183,10 +193,16 @@ function renderMessages() {
 
 /* Init */
 window.onload = async ()=>{
-  await openDB();
-  refreshRooms();
-  console.log("你的 userId：", myId);
+  try {
+    await initDB();
+    refreshRooms();
+    console.log("你的 userId：", myId);
+  } catch(e) {
+    alert("資料庫初始化失敗");
+    console.error(e);
+  }
 };
 </script>
+
 </body>
 </html>
