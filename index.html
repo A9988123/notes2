@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>備忘錄</title>
-
 <style>
 body {
     margin: 0;
@@ -80,7 +79,6 @@ header {
 </head>
 
 <body>
-
 <header>
     <span>備忘錄</span>
     <div>
@@ -101,31 +99,25 @@ header {
     <div id="content" contenteditable="true"></div>
 </div>
 
-<!-- 密碼面板（匯出 / 匯入共用） -->
+<!-- 密碼面板 -->
 <div id="passwordPanel" class="panel">
     <div class="panel-header">
         <button onclick="closePassword()">返回</button>
         <span style="margin-left:10px;" id="passwordTitle">輸入密碼</span>
     </div>
     <div style="padding:20px;">
-        <input id="passwordInput" type="password"
-            placeholder="請輸入密碼"
-            style="width:100%;font-size:18px;padding:10px;">
-        <button id="passwordConfirmBtn"
-            style="margin-top:15px;width:100%;padding:12px;">
-            確認
-        </button>
+        <input id="passwordInput" type="password" placeholder="請輸入密碼" style="width:100%;font-size:18px;padding:10px;">
+        <button id="passwordConfirmBtn" style="margin-top:15px;width:100%;padding:12px;">確認</button>
     </div>
 </div>
 
-<!-- 匯出顯示（備用） -->
+<!-- 匯出顯示 -->
 <div id="exportPanel" class="panel">
     <div class="panel-header">
         <button onclick="closeExport()">返回</button>
         <span style="margin-left:10px;">加密匯出內容</span>
     </div>
-    <textarea id="exportText"
-        style="flex:1;margin:10px;border-radius:8px;"></textarea>
+    <textarea id="exportText" style="flex:1;margin:10px;border-radius:8px;"></textarea>
 </div>
 
 <input type="file" id="backupFile" hidden>
@@ -136,133 +128,145 @@ const DB_NAME = "memoDB";
 const STORE = "notes";
 let db, importFile = null, mode = "";
 
+// 打開資料庫
 function openDB() {
     return new Promise(res => {
         const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = e =>
-            e.target.result.createObjectStore(STORE, { keyPath: "id" });
+        req.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: "id" });
         req.onsuccess = e => { db = e.target.result; res(); };
     });
 }
-function save(note) {
-    db.transaction(STORE, "readwrite").objectStore(STORE).put(note);
+function save(note) { db.transaction(STORE,"readwrite").objectStore(STORE).put(note); }
+function getAll() { 
+    return new Promise(res => { 
+        const r = db.transaction(STORE).objectStore(STORE).getAll(); 
+        r.onsuccess = () => res(r.result || []); 
+    }); 
 }
-function getAll() {
-    return new Promise(res => {
-        const r = db.transaction(STORE).objectStore(STORE).getAll();
-        r.onsuccess = () => res(r.result || []);
-    });
+function removeAll() { db.transaction(STORE,"readwrite").objectStore(STORE).clear(); }
+
+/* AES-GCM 加解密 */
+function str2ab(str){ return new TextEncoder().encode(str); }
+function ab2str(buf){ return new TextDecoder().decode(buf); }
+async function deriveKey(password,salt){
+    const pwKey = await crypto.subtle.importKey("raw",str2ab(password),"PBKDF2",false,["deriveKey"]);
+    return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},pwKey,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
 }
-function removeAll() {
-    db.transaction(STORE, "readwrite").objectStore(STORE).clear();
+async function aesEncrypt(plaintext,password){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password,salt);
+    const ct = await crypto.subtle.encrypt({name:"AES-GCM",iv},key,str2ab(plaintext));
+    const combined = new Uint8Array(salt.length + iv.length + ct.byteLength);
+    combined.set(salt,0);
+    combined.set(iv,salt.length);
+    combined.set(new Uint8Array(ct),salt.length+iv.length);
+    return btoa(String.fromCharCode(...combined));
+}
+async function aesDecrypt(b64,password){
+    const data = Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+    const salt = data.slice(0,16);
+    const iv = data.slice(16,28);
+    const ct = data.slice(28);
+    const key = await deriveKey(password,salt);
+    try {
+        const decrypted = await crypto.subtle.decrypt({name:"AES-GCM",iv},key,ct);
+        return ab2str(decrypted);
+    } catch(e){ throw new Error("密碼錯誤或檔案損壞"); }
 }
 
 /* 匯出 */
 function openExport() {
-    mode = "export";
-    passwordTitle.textContent = "輸入加密密碼";
-    passwordInput.value = "";
-    passwordConfirmBtn.onclick = confirmExport;
-    passwordPanel.style.display = "flex";
+    mode="export";
+    passwordTitle.textContent="輸入加密密碼";
+    passwordInput.value="";
+    passwordConfirmBtn.onclick=confirmExport;
+    passwordPanel.style.display="flex";
 }
-async function confirmExport() {
+async function confirmExport(){
     const pwd = passwordInput.value;
-    if (!pwd) return alert("請輸入密碼");
-
+    if(!pwd) return alert("請輸入密碼");
     const notes = await getAll();
-    const encrypted = simpleEncrypt(JSON.stringify(notes), pwd);
+    const encrypted = await aesEncrypt(JSON.stringify(notes),pwd);
+    passwordPanel.style.display="none";
 
-    passwordPanel.style.display = "none";
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-    if (navigator.share && isIOS) {
-        // iOS 且支援 Web Share API: 直接呼叫分享
-        try {
-            const blob = new Blob([encrypted], { type: "text/plain" });
-            const file = new File([blob], "notes.simple.txt", { type: "text/plain" });
-            await navigator.share({
-                files: [file],
-                title: "備份加密檔",
-                text: "請妥善保存此檔案"
-            });
+    if(navigator.share && isIOS){
+        try{
+            const blob = new Blob([encrypted],{type:"text/plain"});
+            const file = new File([blob],"notes.aes.txt",{type:"text/plain"});
+            await navigator.share({files:[file],title:"備份加密檔",text:"請妥善保存此檔案"});
             alert("✅ 分享成功，請存到檔案或雲端");
-        } catch (err) {
+        }catch(err){
             console.error(err);
-            // 如果分享失敗 fallback 到 textarea
-            exportPanel.style.display = "flex";
+            exportPanel.style.display="flex";
             exportText.value = encrypted;
             exportText.select();
-            exportText.setSelectionRange(0, encrypted.length);
+            exportText.setSelectionRange(0,encrypted.length);
             alert("📄 分享失敗，請手動複製文字備份");
         }
-    } else if (!isIOS) {
-        // Android / 桌機: 自動下載
-        const blob = new Blob([encrypted], { type: "text/plain" });
+    }else if(!isIOS){
+        const blob = new Blob([encrypted],{type:"text/plain"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "notes.simple.txt";
+        a.download = "notes.aes.txt";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         alert("✅ 加密檔已下載");
-    } else {
-        // iOS 不支援 Web Share API: fallback 到 textarea
-        exportPanel.style.display = "flex";
+    }else{
+        exportPanel.style.display="flex";
         exportText.value = encrypted;
         exportText.select();
-        exportText.setSelectionRange(0, encrypted.length);
+        exportText.setSelectionRange(0,encrypted.length);
         alert("📄 請長按複製文字 → 儲存到檔案，完成備份");
     }
 }
 
-
-
 /* 匯入 */
-function openImport(file) {
-    importFile = file;
-    mode = "import";
-    passwordTitle.textContent = "輸入解密密碼";
-    passwordInput.value = "";
-    passwordConfirmBtn.onclick = confirmImport;
-    passwordPanel.style.display = "flex";
+function openImport(file){
+    importFile=file;
+    mode="import";
+    passwordTitle.textContent="輸入解密密碼";
+    passwordInput.value="";
+    passwordConfirmBtn.onclick=confirmImport;
+    passwordPanel.style.display="flex";
 }
-async function confirmImport() {
+async function confirmImport(){
     const pwd = passwordInput.value;
-    if (!pwd) return alert("請輸入密碼");
-    try {
+    if(!pwd) return alert("請輸入密碼");
+    try{
         const text = await importFile.text();
-        const json = simpleDecrypt(text, pwd);
-        JSON.parse(json).forEach(n =>
-            save({ ...n, id: Date.now() + Math.random() })
-        );
+        const json = await aesDecrypt(text,pwd);
+        JSON.parse(json).forEach(n=>save({...n,id:Date.now()+Math.random()}));
         refresh();
         alert("✅ 匯入完成");
-    } catch {
+    }catch{
         alert("❌ 密碼錯誤或檔案損壞");
     }
-    passwordPanel.style.display = "none";
+    passwordPanel.style.display="none";
 }
 
 /* UI */
-function closePassword(){ passwordPanel.style.display = "none"; }
-function closeExport(){ exportPanel.style.display = "none"; }
+function closePassword(){ passwordPanel.style.display="none"; }
+function closeExport(){ exportPanel.style.display="none"; }
 
-async function refresh() {
-    noteList.innerHTML = "";
-    (await getAll()).sort((a,b)=>b.timestamp-a.timestamp).forEach(n => {
-        const d = document.createElement("div");
-        d.className = "note-item";
-        d.innerHTML = `<div class="note-title">${n.title}</div>
-                       <div class="note-sub">${new Date(n.timestamp).toLocaleString()}</div>`;
-        d.onclick = () => openEditor(n.id);
+async function refresh(){
+    noteList.innerHTML="";
+    (await getAll()).sort((a,b)=>b.timestamp-a.timestamp).forEach(n=>{
+        const d=document.createElement("div");
+        d.className="note-item";
+        d.innerHTML=`<div class="note-title">${n.title}</div>
+                     <div class="note-sub">${new Date(n.timestamp).toLocaleString()}</div>`;
+        d.onclick=()=>openEditor(n.id);
         noteList.appendChild(d);
     });
 }
 
-let currentId = null;
+let currentId=null;
 function newNote(){ currentId=null; content.innerHTML=""; openEditor(); }
 async function openEditor(id){
     currentId=id;
@@ -273,41 +277,21 @@ async function openEditor(id){
     editor.style.display="flex";
     noteList.style.display=fab.style.display="none";
 }
-function closeEditor(){
-    editor.style.display="none";
-    noteList.style.display=fab.style.display="";
-    refresh();
-}
+function closeEditor(){ editor.style.display="none"; noteList.style.display=fab.style.display=""; refresh(); }
 function saveEditor(){
-    save({id:currentId||Date.now(),
-        title:content.innerText.slice(0,20),
-        content:content.innerHTML,
-        timestamp:Date.now()});
+    save({id:currentId||Date.now(),title:content.innerText.slice(0,20),content:content.innerHTML,timestamp:Date.now()});
     closeEditor();
 }
-function deleteAllNotes(){
-    if(confirm("確定刪除全部？")){ removeAll(); refresh(); }
-}
-
-/* 簡單加解密 */
-function simpleEncrypt(t,p){
-    return btoa([...t].map((c,i)=>String.fromCharCode(
-        c.charCodeAt(0)^p.charCodeAt(i%p.length))).join(""));
-}
-function simpleDecrypt(b,p){
-    return [...atob(b)].map((c,i)=>String.fromCharCode(
-        c.charCodeAt(0)^p.charCodeAt(i%p.length))).join("");
-}
+function deleteAllNotes(){ if(confirm("確定刪除全部？")){ removeAll(); refresh(); }}
 
 /* 啟動 */
 window.onload = async ()=>{
     await openDB();
     refresh();
-    exportBtn.onclick = openExport;
-    importBtn.onclick = ()=>backupFile.click();
-    backupFile.onchange = ()=>openImport(backupFile.files[0]);
+    exportBtn.onclick=openExport;
+    importBtn.onclick=()=>backupFile.click();
+    backupFile.onchange=()=>openImport(backupFile.files[0]);
 };
 </script>
-
 </body>
 </html>
