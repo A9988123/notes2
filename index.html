@@ -2,296 +2,237 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>備忘錄</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>私密即時聊天</title>
+
 <style>
 body {
-    margin: 0;
-    font-family: -apple-system, system-ui;
-    background: #f5f5f5;
+  margin: 0;
+  font-family: -apple-system, system-ui;
+  background: #f5f5f5;
 }
 header {
-    padding: 14px;
-    font-size: 22px;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
+  padding: 14px;
+  font-size: 20px;
+  font-weight: 600;
+  background: #4a90e2;
+  color: #fff;
 }
-#noteList { padding: 10px; }
-.note-item {
-    background: #fff;
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 10px;
+#roomList { padding: 10px; }
+.room {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
 }
-.note-title { font-size: 16px; font-weight: 500; }
-.note-sub { font-size: 12px; color: #888; }
+.room-title { font-size: 16px; font-weight: 500; }
+.room-sub { font-size: 12px; color: #888; }
+
 #fab {
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: #4a90e2;
-    color: #fff;
-    font-size: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #4a90e2;
+  color: #fff;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-#editor {
-    position: fixed;
-    inset: 0;
-    background: #f5f5f5;
-    display: none;
-    flex-direction: column;
+
+/* Chat */
+#chatView {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  display: none;
+  flex-direction: column;
 }
-#editorHeader {
-    background: #4a90e2;
-    color: #fff;
-    padding: 10px;
-    display: flex;
-    justify-content: space-between;
+#chatHeader {
+  padding: 12px;
+  background: #4a90e2;
+  color: #fff;
+  display: flex;
+  align-items: center;
 }
-#content {
-    flex: 1;
-    padding: 12px;
-    background: #fff;
-    margin: 10px;
-    border-radius: 10px;
-    border: 1px solid #ccc;
+#chatMessages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
 }
-.panel {
-    position: fixed;
-    inset: 0;
-    background: #f5f5f5;
-    display: none;
-    flex-direction: column;
-    z-index: 9999;
+.msg {
+  max-width: 70%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 14px;
 }
-.panel-header {
-    padding: 10px;
-    background: #4a90e2;
-    color: #fff;
+.me {
+  background: #4a90e2;
+  color: #fff;
+  margin-left: auto;
+}
+.other {
+  background: #e5e5ea;
+  color: #000;
+  margin-right: auto;
+}
+#chatInput {
+  display: flex;
+  padding: 10px;
+  background: #fff;
+}
+#msgInput {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 18px;
+  padding: 8px 12px;
 }
 </style>
 </head>
 
 <body>
-<header>
-    <span>備忘錄</span>
-    <div>
-        <button id="exportBtn">加密匯出</button>
-        <button id="importBtn">匯入</button>
-        <button onclick="deleteAllNotes()">刪除全部</button>
-    </div>
-</header>
 
-<div id="noteList"></div>
-<div id="fab" onclick="newNote()">＋</div>
+<header>聊天（即時）</header>
 
-<div id="editor">
-    <div id="editorHeader">
-        <button onclick="closeEditor()">返回</button>
-        <button onclick="saveEditor()">存檔</button>
-    </div>
-    <div id="content" contenteditable="true"></div>
+<div id="roomList"></div>
+<div id="fab" onclick="createRoom()">＋</div>
+
+<div id="chatView">
+  <div id="chatHeader">
+    <button onclick="closeChat()">←</button>
+    <span id="chatTitle" style="margin-left:10px;"></span>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInput">
+    <div id="msgInput" contenteditable="true"></div>
+    <button onclick="sendMsg()">送出</button>
+  </div>
 </div>
-
-<!-- 密碼面板 -->
-<div id="passwordPanel" class="panel">
-    <div class="panel-header">
-        <button onclick="closePassword()">返回</button>
-        <span style="margin-left:10px;" id="passwordTitle">輸入密碼</span>
-    </div>
-    <div style="padding:20px;">
-        <input id="passwordInput" type="password" placeholder="請輸入密碼" style="width:100%;font-size:18px;padding:10px;">
-        <button id="passwordConfirmBtn" style="margin-top:15px;width:100%;padding:12px;">確認</button>
-    </div>
-</div>
-
-<!-- 匯出顯示 -->
-<div id="exportPanel" class="panel">
-    <div class="panel-header">
-        <button onclick="closeExport()">返回</button>
-        <span style="margin-left:10px;">加密匯出內容</span>
-    </div>
-    <textarea id="exportText" style="flex:1;margin:10px;border-radius:8px;"></textarea>
-</div>
-
-<input type="file" id="backupFile" hidden>
 
 <script>
+/* 身分 */
+const myId = localStorage.userId || (
+  localStorage.userId = crypto.randomUUID()
+);
+
+/* WebSocket */
+const ws = new WebSocket("ws://localhost:3000");
+ws.onopen = () => {
+  ws.send(JSON.stringify({ type: "register", userId: myId }));
+};
+ws.onmessage = e => receiveMsg(JSON.parse(e.data));
+
 /* IndexedDB */
-const DB_NAME = "memoDB";
-const STORE = "notes";
-let db, importFile = null, mode = "";
+let db, currentRoom;
 
-// 打開資料庫
-function openDB() {
-    return new Promise(res => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: "id" });
-        req.onsuccess = e => { db = e.target.result; res(); };
+const openDB = () => new Promise(res => {
+  const req = indexedDB.open("chatDB", 1);
+  req.onupgradeneeded = e => {
+    const db = e.target.result;
+    db.createObjectStore("rooms", { keyPath: "id" });
+    db.createObjectStore("messages", { keyPath: "id" });
+  };
+  req.onsuccess = e => { db = e.target.result; res(); };
+});
+const store = (s, m="readonly") => db.transaction(s, m).objectStore(s);
+
+/* Rooms */
+function createRoom() {
+  const peerId = prompt("輸入對方 userId");
+  if (!peerId) return;
+  const room = {
+    id: "room-" + Date.now(),
+    peerId,
+    title: peerId.slice(0,8),
+    updated: Date.now()
+  };
+  store("rooms","readwrite").put(room);
+  refreshRooms();
+}
+
+function refreshRooms() {
+  roomList.innerHTML = "";
+  store("rooms").getAll().onsuccess = e => {
+    e.target.result.forEach(r => {
+      const d = document.createElement("div");
+      d.className = "room";
+      d.innerHTML = `
+        <div class="room-title">${r.title}</div>
+        <div class="room-sub">${new Date(r.updated).toLocaleString()}</div>
+      `;
+      d.onclick = () => openChat(r);
+      roomList.appendChild(d);
     });
-}
-function save(note) { db.transaction(STORE,"readwrite").objectStore(STORE).put(note); }
-function getAll() { 
-    return new Promise(res => { 
-        const r = db.transaction(STORE).objectStore(STORE).getAll(); 
-        r.onsuccess = () => res(r.result || []); 
-    }); 
-}
-function removeAll() { db.transaction(STORE,"readwrite").objectStore(STORE).clear(); }
-
-/* AES-GCM 加解密 */
-function str2ab(str){ return new TextEncoder().encode(str); }
-function ab2str(buf){ return new TextDecoder().decode(buf); }
-async function deriveKey(password,salt){
-    const pwKey = await crypto.subtle.importKey("raw",str2ab(password),"PBKDF2",false,["deriveKey"]);
-    return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:100000,hash:"SHA-256"},pwKey,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
-}
-async function aesEncrypt(plaintext,password){
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await deriveKey(password,salt);
-    const ct = await crypto.subtle.encrypt({name:"AES-GCM",iv},key,str2ab(plaintext));
-    const combined = new Uint8Array(salt.length + iv.length + ct.byteLength);
-    combined.set(salt,0);
-    combined.set(iv,salt.length);
-    combined.set(new Uint8Array(ct),salt.length+iv.length);
-    return btoa(String.fromCharCode(...combined));
-}
-async function aesDecrypt(b64,password){
-    const data = Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
-    const salt = data.slice(0,16);
-    const iv = data.slice(16,28);
-    const ct = data.slice(28);
-    const key = await deriveKey(password,salt);
-    try {
-        const decrypted = await crypto.subtle.decrypt({name:"AES-GCM",iv},key,ct);
-        return ab2str(decrypted);
-    } catch(e){ throw new Error("密碼錯誤或檔案損壞"); }
+  };
 }
 
-/* 匯出 */
-function openExport() {
-    mode="export";
-    passwordTitle.textContent="輸入加密密碼";
-    passwordInput.value="";
-    passwordConfirmBtn.onclick=confirmExport;
-    passwordPanel.style.display="flex";
+/* Chat */
+function openChat(room) {
+  currentRoom = room;
+  chatTitle.textContent = room.title;
+  chatView.style.display = "flex";
+  roomList.style.display = fab.style.display = "none";
+  renderMessages();
 }
-async function confirmExport(){
-    const pwd = passwordInput.value;
-    if(!pwd) return alert("請輸入密碼");
-    const notes = await getAll();
-    const encrypted = await aesEncrypt(JSON.stringify(notes),pwd);
-    passwordPanel.style.display="none";
-
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-
-    if(navigator.share && isIOS){
-        try{
-            const blob = new Blob([encrypted],{type:"text/plain"});
-            const file = new File([blob],"notes.aes.txt",{type:"text/plain"});
-            await navigator.share({files:[file],title:"備份加密檔",text:"請妥善保存此檔案"});
-            alert("✅ 分享成功，請存到檔案或雲端");
-        }catch(err){
-            console.error(err);
-            exportPanel.style.display="flex";
-            exportText.value = encrypted;
-            exportText.select();
-            exportText.setSelectionRange(0,encrypted.length);
-            alert("📄 分享失敗，請手動複製文字備份");
-        }
-    }else if(!isIOS){
-        const blob = new Blob([encrypted],{type:"text/plain"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "notes.aes.txt";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        alert("✅ 加密檔已下載");
-    }else{
-        exportPanel.style.display="flex";
-        exportText.value = encrypted;
-        exportText.select();
-        exportText.setSelectionRange(0,encrypted.length);
-        alert("📄 請長按複製文字 → 儲存到檔案，完成備份");
-    }
+function closeChat() {
+  chatView.style.display = "none";
+  roomList.style.display = fab.style.display = "";
+  refreshRooms();
 }
 
-/* 匯入 */
-function openImport(file){
-    importFile=file;
-    mode="import";
-    passwordTitle.textContent="輸入解密密碼";
-    passwordInput.value="";
-    passwordConfirmBtn.onclick=confirmImport;
-    passwordPanel.style.display="flex";
-}
-async function confirmImport(){
-    const pwd = passwordInput.value;
-    if(!pwd) return alert("請輸入密碼");
-    try{
-        const text = await importFile.text();
-        const json = await aesDecrypt(text,pwd);
-        JSON.parse(json).forEach(n=>save({...n,id:Date.now()+Math.random()}));
-        refresh();
-        alert("✅ 匯入完成");
-    }catch{
-        alert("❌ 密碼錯誤或檔案損壞");
-    }
-    passwordPanel.style.display="none";
+function sendMsg() {
+  const text = msgInput.innerHTML.trim();
+  if (!text) return;
+
+  const msg = {
+    type: "message",
+    id: Date.now(),
+    roomId: currentRoom.id,
+    from: myId,
+    to: currentRoom.peerId,
+    content: text,
+    timestamp: Date.now()
+  };
+
+  ws.send(JSON.stringify(msg));
+  store("messages","readwrite").put(msg);
+  msgInput.innerHTML = "";
+  renderMessages();
 }
 
-/* UI */
-function closePassword(){ passwordPanel.style.display="none"; }
-function closeExport(){ exportPanel.style.display="none"; }
-
-async function refresh(){
-    noteList.innerHTML="";
-    (await getAll()).sort((a,b)=>b.timestamp-a.timestamp).forEach(n=>{
-        const d=document.createElement("div");
-        d.className="note-item";
-        d.innerHTML=`<div class="note-title">${n.title}</div>
-                     <div class="note-sub">${new Date(n.timestamp).toLocaleString()}</div>`;
-        d.onclick=()=>openEditor(n.id);
-        noteList.appendChild(d);
-    });
+function receiveMsg(msg) {
+  store("messages","readwrite").put(msg);
+  if (currentRoom && msg.roomId === currentRoom.id) {
+    renderMessages();
+  }
 }
 
-let currentId=null;
-function newNote(){ currentId=null; content.innerHTML=""; openEditor(); }
-async function openEditor(id){
-    currentId=id;
-    if(id){
-        const n=(await getAll()).find(x=>x.id===id);
-        content.innerHTML=n?.content||"";
-    }
-    editor.style.display="flex";
-    noteList.style.display=fab.style.display="none";
+function renderMessages() {
+  chatMessages.innerHTML = "";
+  store("messages").getAll().onsuccess = e => {
+    e.target.result
+      .filter(m => m.roomId === currentRoom.id)
+      .sort((a,b)=>a.timestamp-b.timestamp)
+      .forEach(m => {
+        const d = document.createElement("div");
+        d.className = "msg " + (m.from === myId ? "me" : "other");
+        d.textContent = m.content;
+        chatMessages.appendChild(d);
+      });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  };
 }
-function closeEditor(){ editor.style.display="none"; noteList.style.display=fab.style.display=""; refresh(); }
-function saveEditor(){
-    save({id:currentId||Date.now(),title:content.innerText.slice(0,20),content:content.innerHTML,timestamp:Date.now()});
-    closeEditor();
-}
-function deleteAllNotes(){ if(confirm("確定刪除全部？")){ removeAll(); refresh(); }}
 
-/* 啟動 */
-window.onload = async ()=>{
-    await openDB();
-    refresh();
-    exportBtn.onclick=openExport;
-    importBtn.onclick=()=>backupFile.click();
-    backupFile.onchange=()=>openImport(backupFile.files[0]);
+/* Init */
+window.onload = async () => {
+  await openDB();
+  refreshRooms();
+  console.log("你的 userId：", myId);
 };
 </script>
+
 </body>
 </html>
