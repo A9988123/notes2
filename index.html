@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>私密即時聊天</title>
+
 <style>
 body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
 header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; }
@@ -13,9 +14,10 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
 .room-sub { font-size:12px; color:#888; }
 
 #fab {
-  position: fixed; right:18px; bottom:18px; width:56px; height:56px;
-  border-radius:50%; background:#4a90e2; color:#fff; font-size:32px;
-  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  position:fixed; right:18px; bottom:18px;
+  width:56px; height:56px; border-radius:50%;
+  background:#4a90e2; color:#fff; font-size:32px;
+  display:flex; align-items:center; justify-content:center;
 }
 
 #chatView { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
@@ -27,195 +29,160 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
 #chatInput { display:flex; padding:10px; background:#fff; }
 #msgInput { flex:1; border:1px solid #ccc; border-radius:18px; padding:8px 12px; }
 
-#addPanel { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; z-index:9999; }
+#addPanel { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
 </style>
 </head>
+
 <body>
 
 <header>聊天（即時）</header>
 <div id="roomList"></div>
 <div id="fab">＋</div>
 
-<!-- 新增聊天室 -->
 <div id="addPanel">
   <div style="padding:12px; background:#4a90e2; color:#fff;">
-    <button id="closeAddBtn">←</button> 新增聊天室
+    <button onclick="closeAdd()">←</button> 新增聊天室
   </div>
   <div style="padding:20px;">
-    <input id="peerInput" placeholder="輸入對方 userId" style="width:100%; font-size:16px; padding:10px;">
-    <button id="confirmAddBtn" style="margin-top:15px; width:100%; padding:12px;">建立</button>
+    <input id="peerInput" placeholder="輸入對方 userId"
+      style="width:100%; font-size:16px; padding:10px;" />
+    <button onclick="confirmAdd()"
+      style="margin-top:15px; width:100%; padding:12px;">
+      建立
+    </button>
   </div>
 </div>
 
-<!-- Chat -->
 <div id="chatView">
   <div id="chatHeader">
-    <button id="closeChatBtn">←</button>
+    <button onclick="closeChat()">←</button>
     <span id="chatTitle" style="margin-left:10px;"></span>
   </div>
   <div id="chatMessages"></div>
   <div id="chatInput">
     <div id="msgInput" contenteditable="true"></div>
-    <button id="sendMsgBtn">送出</button>
+    <button onclick="sendMsg()">送出</button>
   </div>
 </div>
 
 <script>
-// 安全 UUID
-function genUUID() {
-  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
-    const r=Math.random()*16|0; const v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
+// ===== UUID =====
+function genUUID(){
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);
   });
 }
 
-// 固定 userId
 const myId = localStorage.userId || (localStorage.userId = genUUID());
-console.log("你的 userId：", myId);
+console.log("我的 userId:", myId);
 
-/* DOM */
-const roomList = document.getElementById("roomList");
-const fab = document.getElementById("fab");
-const addPanel = document.getElementById("addPanel");
-const peerInput = document.getElementById("peerInput");
-const chatView = document.getElementById("chatView");
-const chatTitle = document.getElementById("chatTitle");
-const chatMessages = document.getElementById("chatMessages");
-const msgInput = document.getElementById("msgInput");
-const closeAddBtn = document.getElementById("closeAddBtn");
-const confirmAddBtn = document.getElementById("confirmAddBtn");
-const closeChatBtn = document.getElementById("closeChatBtn");
-const sendMsgBtn = document.getElementById("sendMsgBtn");
-
-/* WebSocket */
+// ===== WebSocket =====
 const ws = new WebSocket("ws://192.168.0.13:3000");
-ws.onopen = ()=> ws.send(JSON.stringify({type:"register",userId:myId}));
+ws.onopen = () => ws.send(JSON.stringify({ type:"register", userId: myId }));
 ws.onmessage = e => receiveMsg(JSON.parse(e.data));
 
-/* IndexedDB */
-let db,currentRoom;
+// ===== IndexedDB =====
+let db, currentRoom;
 const openDB = () => new Promise(res=>{
-  const req = indexedDB.open("chatDB",1);
-  req.onupgradeneeded = e=>{
+  const r=indexedDB.open("chatDB",1);
+  r.onupgradeneeded=e=>{
     const d=e.target.result;
     d.createObjectStore("rooms",{keyPath:"id"});
     d.createObjectStore("messages",{keyPath:"id"});
   };
-  req.onsuccess = e=>{ db=e.target.result; res(); };
+  r.onsuccess=e=>{db=e.target.result;res();}
 });
 const store=(s,m="readonly")=>db.transaction(s,m).objectStore(s);
 
-/* 新增聊天室 */
-function openAdd(){ addPanel.style.display="flex"; peerInput.value=""; }
+// ===== UI =====
+fab.onclick = () => addPanel.style.display="flex";
 function closeAdd(){ addPanel.style.display="none"; }
-function confirmAdd(){
-  if(!db) return alert("資料庫尚未初始化");
-  const peerId = peerInput.value.trim();
-  if(!peerId) return alert("請輸入對方 userId");
-  if(peerId === myId) return alert("不能與自己聊天");
 
-  const roomId = [myId,peerId].sort().join("_");
-  const room = {
-    id: roomId,
-    peerId: peerId,      // 對方的 userId
-    title: peerId.slice(0,8),
-    updated: Date.now()
-  };
-  store("rooms","readwrite").put(room);
+// ===== 新增聊天室（手動）=====
+function confirmAdd(){
+  const peerId = peerInput.value.trim();
+  if(!peerId || peerId===myId) return alert("peerId 錯誤");
+
+  createRoom(peerId);
   closeAdd();
-  refreshRooms();
 }
 
-/* Rooms */
+// ===== 核心：建立聊天室 =====
+function createRoom(peerId){
+  const roomId=[myId,peerId].sort().join("_");
+  store("rooms").get(roomId).onsuccess=e=>{
+    if(!e.target.result){
+      store("rooms","readwrite").put({
+        id:roomId,
+        peerId,
+        title:peerId.slice(0,8),
+        updated:Date.now()
+      });
+      refreshRooms();
+    }
+  };
+}
+
+// ===== Rooms =====
 function refreshRooms(){
   roomList.innerHTML="";
   store("rooms").getAll().onsuccess=e=>{
     e.target.result.forEach(r=>{
       const d=document.createElement("div");
       d.className="room";
-      d.innerHTML=`<div class="room-title">${r.title}</div>
-                   <div class="room-sub">${new Date(r.updated).toLocaleString()}</div>`;
+      d.innerHTML=`<div class="room-title">${r.title}</div>`;
       d.onclick=()=>openChat(r);
       roomList.appendChild(d);
     });
   };
 }
 
-/* Chat */
-function openChat(room){
-  currentRoom=room;
-  chatTitle.textContent=room.title;
+// ===== Chat =====
+function openChat(r){
+  currentRoom=r;
+  chatTitle.textContent=r.title;
   chatView.style.display="flex";
-  roomList.style.display=fab.style.display="none";
   renderMessages();
 }
-function closeChat(){
-  chatView.style.display="none";
-  roomList.style.display=fab.style.display="flex";
-  refreshRooms();
-}
+function closeChat(){ chatView.style.display="none"; }
 
 function sendMsg(){
-  const text=msgInput.innerText.trim();
-  if(!text || !currentRoom) return;
-  const msg={
-    type:"message",
-    id:genUUID(),
-    roomId:currentRoom.id,
-    from:myId,
-    to:currentRoom.peerId,
-    content:text,
-    timestamp:Date.now()
-  };
-  ws.send(JSON.stringify(msg));
-  store("messages","readwrite").put(msg);
+  const t=msgInput.innerText.trim();
+  if(!t) return;
+  const m={type:"message",id:genUUID(),roomId:currentRoom.id,from:myId,to:currentRoom.peerId,content:t,timestamp:Date.now()};
+  ws.send(JSON.stringify(m));
+  store("messages","readwrite").put(m);
   msgInput.innerHTML="";
   renderMessages();
 }
 
-function receiveMsg(msg){
-  store("messages","readwrite").put(msg);
-  store("rooms").get(msg.roomId).onsuccess=e=>{
-    if(!e.target.result){
-      store("rooms","readwrite").put({
-        id:msg.roomId,
-        peerId:msg.from,
-        title:msg.from.slice(0,8),
-        updated:Date.now()
-      });
-      refreshRooms();
-    }
-  };
-  if(currentRoom && msg.roomId===currentRoom.id) renderMessages();
+function receiveMsg(m){
+  store("messages","readwrite").put(m);
+  createRoom(m.from);
+  if(currentRoom && m.roomId===currentRoom.id) renderMessages();
 }
 
 function renderMessages(){
   chatMessages.innerHTML="";
   store("messages").getAll().onsuccess=e=>{
-    e.target.result
-     .filter(m=>m.roomId===currentRoom.id)
-     .sort((a,b)=>a.timestamp-b.timestamp)
-     .forEach(m=>{
-       const d=document.createElement("div");
-       d.className="msg "+(m.from===myId?"me":"other");
-       d.textContent=m.content;
-       chatMessages.appendChild(d);
-     });
-    chatMessages.scrollTop=chatMessages.scrollHeight;
+    e.target.result.filter(m=>m.roomId===currentRoom.id)
+      .forEach(m=>{
+        const d=document.createElement("div");
+        d.className="msg "+(m.from===myId?"me":"other");
+        d.textContent=m.content;
+        chatMessages.appendChild(d);
+      });
   };
 }
 
-/* 綁定事件 */
-fab.onclick=openAdd;
-closeAddBtn.onclick=closeAdd;
-confirmAddBtn.onclick=confirmAdd;
-closeChatBtn.onclick=closeChat;
-sendMsgBtn.onclick=sendMsg;
-
-/* Init */
+// ===== Init：手機自動連桌機 =====
 window.onload=async()=>{
   await openDB();
   refreshRooms();
+
+  const DESKTOP_ID="f62734cf-f477-4bfd-b069-a26c493e90c8";
+  if(myId!==DESKTOP_ID) createRoom(DESKTOP_ID);
 };
 </script>
 </body>
