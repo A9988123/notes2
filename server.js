@@ -5,8 +5,16 @@ const wss = new WebSocketServer({ port: 3000 });
 const clients = new Map(); // userId -> ws
 
 wss.on("connection", ws => {
+  console.log("New connection");
+
   ws.on("message", data => {
-    const msg = JSON.parse(data);
+    let msg;
+    try {
+      msg = JSON.parse(data);
+    } catch(e) {
+      console.error("Invalid JSON:", data);
+      return;
+    }
 
     // 使用者註冊
     if (msg.type === "register") {
@@ -19,8 +27,11 @@ wss.on("connection", ws => {
     // 傳訊息
     if (msg.type === "message") {
       const target = clients.get(msg.to);
-      if (target) {
+      if (target && target.readyState === WebSocket.OPEN) {
         target.send(JSON.stringify(msg));
+        console.log(`Message from ${msg.from} → ${msg.to}: ${msg.content}`);
+      } else {
+        console.log(`Target ${msg.to} not connected`);
       }
     }
   });
@@ -33,5 +44,4 @@ wss.on("connection", ws => {
   });
 });
 
-console.log("✅ WebSocket server running at ws://localhost:3000");
-
+console.log("✅ WebSocket server running at ws://0.0.0.0:3000");
