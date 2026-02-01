@@ -176,14 +176,32 @@ function renderMessages(){
   };
 }
 
-// ===== Init：手機自動連桌機 =====
-window.onload=async()=>{
+// ===== Role 判斷 =====
+const params = new URLSearchParams(location.search);
+const role = params.get("role"); // desktop / mobile
+
+// ★ 固定一台桌機 ID（你現在測試用）
+const DESKTOP_ID = "f62734cf-f477-4bfd-b069-a26c493e90c8";
+
+// ===== Init =====
+window.onload = async () => {
   await openDB();
   refreshRooms();
 
-  const DESKTOP_ID="f62734cf-f477-4bfd-b069-a26c493e90c8";
-  if(myId!==DESKTOP_ID) createRoom(DESKTOP_ID);
+  console.log("我的角色:", role);
+
+  if (role === "mobile") {
+    // 手機自動建立與桌機的聊天室
+    if (myId !== DESKTOP_ID) {
+      createRoom(DESKTOP_ID);
+    }
+  }
+
+  if (role === "desktop") {
+    console.log("桌機已就緒，等待手機連線");
+  }
 };
+
 </script>
 </body>
 </html>
