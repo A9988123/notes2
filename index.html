@@ -43,7 +43,7 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
     <button onclick="closeAdd()">←</button> 新增聊天室
   </div>
   <div style="padding:20px;">
-    <input id="peerInput" placeholder="輸入對方 userId（UUID）"
+    <input id="peerInput" placeholder="輸入對方 userId"
       style="width:100%; font-size:16px; padding:10px;" />
     <button onclick="confirmAdd()"
       style="margin-top:15px; width:100%; padding:12px;">
@@ -65,7 +65,7 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
 </div>
 
 <script>
-/* ===== 基本工具 ===== */
+/* ===== 工具 ===== */
 function genUUID(){
   if (crypto.randomUUID) return crypto.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
@@ -76,12 +76,21 @@ function isUUID(v){
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
-/* ===== 角色 ===== */
+/* ===== 角色判斷 ===== */
 const params = new URLSearchParams(location.search);
 const role = params.get("role") || "mobile";
 
-/* ===== 使用者 ID ===== */
-const myId = localStorage.userId || (localStorage.userId = genUUID());
+/* ===== userId 規則（解法 A 核心） ===== */
+const FIXED_DESKTOP_ID = "desktop-aa-001";
+
+let myId;
+if (role === "desktop") {
+  myId = FIXED_DESKTOP_ID;
+  localStorage.userId = FIXED_DESKTOP_ID;
+} else {
+  myId = localStorage.userId || (localStorage.userId = genUUID());
+}
+
 console.log("我的 userId:", myId, "角色:", role);
 
 /* ===== WebSocket ===== */
@@ -112,24 +121,19 @@ function closeAdd(){ addPanel.style.display="none"; }
 /* ===== 建立聊天室（防呆） ===== */
 function confirmAdd(){
   const peerId = peerInput.value.trim();
-
-  if (!isUUID(peerId)) return alert("peerId 必須是 UUID");
-  if (peerId === myId) return alert("不能跟自己聊天");
-
+  if (!peerId || peerId === myId) return alert("peerId 錯誤");
   createRoom(peerId);
   closeAdd();
 }
 
 function createRoom(peerId){
-  if (!isUUID(peerId)) return;
-
   const roomId=[myId,peerId].sort().join("_");
   store("rooms").get(roomId).onsuccess=e=>{
     if(!e.target.result){
       store("rooms","readwrite").put({
         id:roomId,
-        peerId,                 // ✅ 永遠是 UUID
-        title:peerId.slice(0,8),// UI 顯示
+        peerId,
+        title:peerId === FIXED_DESKTOP_ID ? "桌機" : peerId.slice(0,8),
         updated:Date.now()
       });
       refreshRooms();
@@ -161,18 +165,14 @@ function openChat(r){
 function closeChat(){ chatView.style.display="none"; }
 
 function sendMsg(){
-  if (!currentRoom) return;
-
+  if(!currentRoom) return;
   const to = currentRoom.peerId;
-  if (!isUUID(to)) {
-    alert("peerId 非法，拒絕送出");
-    return;
-  }
+  if (!to) return alert("peerId 不存在");
+
+  console.log("📤 傳送給:", to);
 
   const t=msgInput.innerText.trim();
   if(!t) return;
-
-  console.log("📤 傳送給:", to);
 
   const m={
     type:"message",
@@ -216,9 +216,9 @@ window.onload = async()=>{
   await openDB();
   refreshRooms();
 
-  const DESKTOP_ID="f62734cf-f477-4bfd-b069-a26c493e90c8";
-  if(role==="mobile" && myId!==DESKTOP_ID){
-    createRoom(DESKTOP_ID);
+  // 手機自動連桌機
+  if(role==="mobile"){
+    createRoom(FIXED_DESKTOP_ID);
   }
 };
 </script>
