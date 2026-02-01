@@ -109,7 +109,7 @@ function confirmAdd(){
   if(!peerId) return alert("請輸入對方 userId / 名稱");
   
   const roomId = [myId, peerId].sort().join("_");
-  const room = { id:roomId, peerId, title:peerId.slice(0,8), updated:Date.now() };
+  const room = { id:roomId, peerId:0d99b747-40d7-448a-9f51-d6447101bd28, title:peerId.slice(0,8), updated:Date.now() };
   store("rooms","readwrite").put(room);
   closeAdd();
   refreshRooms();
