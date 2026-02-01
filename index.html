@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>即時聊天</title>
+<title>私密即時聊天</title>
 <style>
 body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
 header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; }
@@ -53,25 +53,24 @@ header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; colo
 <script>
 // ===== UUID =====
 function genUUID(){
-  if(crypto.randomUUID) return crypto.randomUUID();
+  if (crypto.randomUUID) return crypto.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
     const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);
   });
 }
 
-// ===== 角色判定 =====
-const params = new URLSearchParams(location.search);
-const role = params.get("role") || "desktop"; // desktop / mobile
-const FIXED_DESKTOP_ID = "desktop-aa-001";
-
-// ===== myId =====
-const myId = (role==="desktop") ? FIXED_DESKTOP_ID : (localStorage.userId || (localStorage.userId = genUUID()));
+// ===== 固定桌機 UUID =====
+const DESKTOP_ID = "cf4d963b-eb62-44cd-aa4d-368a4ac5220e";
+let myId = localStorage.userId || genUUID();
+localStorage.userId = myId;
 console.log("我的 userId:", myId);
-console.log("我的角色:", role);
 
 // ===== WebSocket =====
 const ws = new WebSocket("ws://192.168.0.13:3000");
-ws.onopen = ()=>ws.send(JSON.stringify({ type:"register", userId: myId }));
+ws.onopen = () => {
+  ws.send(JSON.stringify({ type:"register", userId: myId }));
+  console.log("WS 已註冊:", myId);
+};
 ws.onmessage = e => receiveMsg(JSON.parse(e.data));
 
 // ===== IndexedDB =====
@@ -80,18 +79,18 @@ const openDB = () => new Promise(res=>{
   const r=indexedDB.open("chatDB",1);
   r.onupgradeneeded=e=>{
     const d=e.target.result;
-    d.createObjectStore("rooms",{keyPath:"id"});
-    d.createObjectStore("messages",{keyPath:"id"});
+    if(!d.objectStoreNames.contains("rooms")) d.createObjectStore("rooms",{keyPath:"id"});
+    if(!d.objectStoreNames.contains("messages")) d.createObjectStore("messages",{keyPath:"id"});
   };
-  r.onsuccess=e=>{db=e.target.result; res();}
+  r.onsuccess=e=>{ db=e.target.result; res(); };
 });
-const store = (s,m="readonly")=>db.transaction(s,m).objectStore(s);
+const store=(s,m="readonly")=>db.transaction(s,m).objectStore(s);
 
 // ===== UI =====
-fab.onclick = ()=>addPanel.style.display="flex";
+fab.onclick = () => addPanel.style.display="flex";
 function closeAdd(){ addPanel.style.display="none"; }
 
-// ===== 新增聊天室 =====
+// ===== 新增聊天室（手動）=====
 function confirmAdd(){
   const peerId = peerInput.value.trim();
   if(!peerId || peerId===myId) return alert("peerId 錯誤");
@@ -99,14 +98,14 @@ function confirmAdd(){
   closeAdd();
 }
 
-// ===== 核心：建立聊天室 =====
+// ===== 建立聊天室核心 =====
 function createRoom(peerId){
   const roomId=[myId,peerId].sort().join("_");
   store("rooms").get(roomId).onsuccess=e=>{
     if(!e.target.result){
       store("rooms","readwrite").put({
         id: roomId,
-        peerId,
+        peerId, // 一定要是 UUID
         title: peerId.slice(0,8),
         updated: Date.now()
       });
@@ -139,16 +138,20 @@ function openChat(r){
 function closeChat(){ chatView.style.display="none"; }
 
 function sendMsg(){
-  const t = msgInput.innerText.trim();
-  if(!t || !currentRoom) return;
-  const m = {
+  const t=msgInput.innerText.trim();
+  if(!t) return;
+  if(!currentRoom || !currentRoom.peerId){
+    alert("peerId 非法");
+    return;
+  }
+  const m={
     type:"message",
-    id:genUUID(),
-    roomId:currentRoom.id,
-    from:myId,
-    to:currentRoom.peerId,
-    content:t,
-    timestamp:Date.now()
+    id: genUUID(),
+    roomId: currentRoom.id,
+    from: myId,
+    to: currentRoom.peerId,
+    content: t,
+    timestamp: Date.now()
   };
   ws.send(JSON.stringify(m));
   store("messages","readwrite").put(m);
@@ -157,6 +160,7 @@ function sendMsg(){
 }
 
 function receiveMsg(m){
+  if(!m.from || !m.to) return;
   store("messages","readwrite").put(m);
   createRoom(m.from);
   if(currentRoom && m.roomId===currentRoom.id) renderMessages();
@@ -165,7 +169,7 @@ function receiveMsg(m){
 function renderMessages(){
   chatMessages.innerHTML="";
   store("messages").getAll().onsuccess=e=>{
-    e.target.result.filter(m=>m.roomId===currentRoom?.id)
+    e.target.result.filter(m=>m.roomId===currentRoom.id)
       .forEach(m=>{
         const d=document.createElement("div");
         d.className="msg "+(m.from===myId?"me":"other");
@@ -175,14 +179,13 @@ function renderMessages(){
   };
 }
 
-// ===== Init =====
-window.onload = async()=>{
+// ===== Init：手機自動連桌機 =====
+window.onload=async()=>{
   await openDB();
   refreshRooms();
-
-  if(role==="mobile"){
-    // 手機自動連桌機
-    createRoom(FIXED_DESKTOP_ID);
+  // 如果不是桌機，就自動建立與桌機的聊天室
+  if(myId !== DESKTOP_ID){
+    createRoom(DESKTOP_ID);
   }
 };
 </script>
