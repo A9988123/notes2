@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -38,9 +38,10 @@ header {
   background: #4a90e2;
   color: #fff;
   font-size: 32px;
-  display: flex;
+  display: none; /* 先隱藏，等 DB ready */
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
 /* Chat */
@@ -108,18 +109,18 @@ header {
 <header>聊天（即時）</header>
 
 <div id="roomList"></div>
-<div id="fab" onclick="openAdd()">＋</div>
+<div id="fab">＋</div>
 
 <!-- 新增聊天室 -->
 <div id="addPanel">
   <div style="padding:12px; background:#4a90e2; color:#fff;">
-    <button onclick="closeAdd()">←</button>
+    <button id="closeAddBtn">←</button>
     新增聊天室
   </div>
   <div style="padding:20px;">
     <input id="peerInput" placeholder="輸入對方 userId"
       style="width:100%; font-size:16px; padding:10px;">
-    <button onclick="confirmAdd()"
+    <button id="confirmAddBtn"
       style="margin-top:15px; width:100%; padding:12px;">
       建立
     </button>
@@ -129,21 +130,46 @@ header {
 <!-- Chat -->
 <div id="chatView">
   <div id="chatHeader">
-    <button onclick="closeChat()">←</button>
+    <button id="closeChatBtn">←</button>
     <span id="chatTitle" style="margin-left:10px;"></span>
   </div>
   <div id="chatMessages"></div>
   <div id="chatInput">
     <div id="msgInput" contenteditable="true"></div>
-    <button onclick="sendMsg()">送出</button>
+    <button id="sendMsgBtn">送出</button>
   </div>
 </div>
 
 <script>
-/* 身分 */
-const myId = localStorage.userId || (
-  localStorage.userId = crypto.randomUUID()
-);
+// 安全的 UUID 產生函數
+function genUUID() {
+  // 新版瀏覽器支援 crypto.randomUUID()
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  
+  // fallback: 手動生成 UUID v4
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// 產生唯一使用者 ID
+const myId = localStorage.userId || (localStorage.userId = genUUID());
+
+/* DOM 元素 */
+const roomList = document.getElementById("roomList");
+const fab = document.getElementById("fab");
+const addPanel = document.getElementById("addPanel");
+const peerInput = document.getElementById("peerInput");
+const chatView = document.getElementById("chatView");
+const chatTitle = document.getElementById("chatTitle");
+const chatMessages = document.getElementById("chatMessages");
+const msgInput = document.getElementById("msgInput");
+const closeAddBtn = document.getElementById("closeAddBtn");
+const confirmAddBtn = document.getElementById("confirmAddBtn");
+const closeChatBtn = document.getElementById("closeChatBtn");
+const sendMsgBtn = document.getElementById("sendMsgBtn");
 
 /* WebSocket */
 const ws = new WebSocket("ws://192.168.0.13:3000");
@@ -152,7 +178,6 @@ ws.onmessage = e => receiveMsg(JSON.parse(e.data));
 
 /* IndexedDB */
 let db, currentRoom;
-
 const openDB = () => new Promise(res => {
   const req = indexedDB.open("chatDB", 1);
   req.onupgradeneeded = e => {
@@ -173,6 +198,8 @@ function closeAdd() {
   addPanel.style.display = "none";
 }
 function confirmAdd() {
+  if (!db) return alert("資料庫尚未初始化");
+
   const peerId = peerInput.value.trim();
   if (!peerId) return alert("請輸入 userId");
 
@@ -217,17 +244,17 @@ function openChat(room) {
 }
 function closeChat() {
   chatView.style.display = "none";
-  roomList.style.display = fab.style.display = "";
+  roomList.style.display = fab.style.display = "flex";
   refreshRooms();
 }
 
 function sendMsg() {
   const text = msgInput.innerText.trim();
-  if (!text) return;
+  if (!text || !currentRoom) return;
 
   const msg = {
     type: "message",
-    id: crypto.randomUUID(),
+    id: genUUID(),
     roomId: currentRoom.id,
     from: myId,
     to: currentRoom.peerId,
@@ -278,10 +305,18 @@ function renderMessages() {
   };
 }
 
+/* 綁定事件 */
+fab.onclick = openAdd;
+closeAddBtn.onclick = closeAdd;
+confirmAddBtn.onclick = confirmAdd;
+closeChatBtn.onclick = closeChat;
+sendMsgBtn.onclick = sendMsg;
+
 /* Init */
 window.onload = async () => {
   await openDB();
   refreshRooms();
+  fab.style.display = "flex";
   console.log("你的 userId：", myId);
 };
 </script>
