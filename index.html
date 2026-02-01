@@ -1,209 +1,323 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>私密即時聊天</title>
+
 <style>
-body { margin:0; font-family:-apple-system, system-ui; background:#f5f5f5; }
-header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; }
-#roomList { padding:10px; }
-.room { background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; }
-.room-title { font-size:16px; font-weight:500; }
-.room-sub { font-size:12px; color:#888; }
-#fab { position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%; background:#4a90e2; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+body {
+  margin: 0;
+  font-family: -apple-system, system-ui;
+  background: #f5f5f5;
+}
+header {
+  padding: 14px;
+  font-size: 20px;
+  font-weight: 600;
+  background: #4a90e2;
+  color: #fff;
+}
+#roomList { padding: 10px; }
+.room {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.room-title { font-size: 16px; font-weight: 500; }
+.room-sub { font-size: 12px; color: #888; }
+
+#fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #4a90e2;
+  color: #fff;
+  font-size: 32px;
+  display: none; /* 先隱藏，等 DB ready */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
 
 /* Chat */
-#chatView { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
-#chatHeader { padding:12px; background:#4a90e2; color:#fff; display:flex; align-items:center; }
-#chatMessages { flex:1; padding:10px; overflow-y:auto; }
-.msg { max-width:70%; padding:10px; margin:6px 0; border-radius:14px; }
-.me { background:#4a90e2; color:#fff; margin-left:auto; }
-.other { background:#e5e5ea; color:#000; margin-right:auto; }
-#chatInput { display:flex; padding:10px; background:#fff; }
-#msgInput { flex:1; border:1px solid #ccc; border-radius:18px; padding:8px 12px; }
+#chatView {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  display: none;
+  flex-direction: column;
+}
+#chatHeader {
+  padding: 12px;
+  background: #4a90e2;
+  color: #fff;
+  display: flex;
+  align-items: center;
+}
+#chatMessages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+.msg {
+  max-width: 70%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 14px;
+}
+.me {
+  background: #4a90e2;
+  color: #fff;
+  margin-left: auto;
+}
+.other {
+  background: #e5e5ea;
+  color: #000;
+  margin-right: auto;
+}
+#chatInput {
+  display: flex;
+  padding: 10px;
+  background: #fff;
+}
+#msgInput {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 18px;
+  padding: 8px 12px;
+}
 
 /* Add room panel */
-#addPanel { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; z-index:9999; }
+#addPanel {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  display: none;
+  flex-direction: column;
+  z-index: 9999;
+}
 </style>
 </head>
+
 <body>
 
 <header>聊天（即時）</header>
 
 <div id="roomList"></div>
-<div id="fab" onclick="openAdd()">＋</div>
+<div id="fab">＋</div>
 
 <!-- 新增聊天室 -->
 <div id="addPanel">
   <div style="padding:12px; background:#4a90e2; color:#fff;">
-    <button onclick="closeAdd()">←</button> 新增聊天室
+    <button id="closeAddBtn">←</button>
+    新增聊天室
   </div>
   <div style="padding:20px;">
-    <input id="peerInput" placeholder="輸入對方 userId / 對方名字"
+    <input id="peerInput" placeholder="輸入對方 userId"
       style="width:100%; font-size:16px; padding:10px;">
-    <button onclick="confirmAdd()"
-      style="margin-top:15px; width:100%; padding:12px;">建立</button>
+    <button id="confirmAddBtn"
+      style="margin-top:15px; width:100%; padding:12px;">
+      建立
+    </button>
   </div>
 </div>
 
 <!-- Chat -->
 <div id="chatView">
   <div id="chatHeader">
-    <button onclick="closeChat()">←</button>
+    <button id="closeChatBtn">←</button>
     <span id="chatTitle" style="margin-left:10px;"></span>
   </div>
   <div id="chatMessages"></div>
   <div id="chatInput">
     <div id="msgInput" contenteditable="true"></div>
-    <button onclick="sendMsg()">送出</button>
+    <button id="sendMsgBtn">送出</button>
   </div>
 </div>
 
 <script>
-/* 安全 UUID 產生（舊瀏覽器 fallback） */
+// 安全的 UUID 產生函數
 function genUUID() {
+  // 新版瀏覽器支援 crypto.randomUUID()
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
-    const r = Math.random()*16|0; const v = c==='x'?r:(r&0x3|0x8); return v.toString(16);
+  
+  // fallback: 手動生成 UUID v4
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
   });
 }
 
-/* 身分 */
+// 產生唯一使用者 ID
 const myId = localStorage.userId || (localStorage.userId = genUUID());
-console.log("你的 userId：", myId);
 
-/* WebSocket */
-const ws = new WebSocket("ws://192.168.0.13:3000"); // <-- 改成桌機 LAN IP
-ws.onopen = () => ws.send(JSON.stringify({ type:"register", userId:myId }));
-ws.onmessage = e => receiveMsg(JSON.parse(e.data));
-
-/* IndexedDB */
-let db, currentRoom;
-const openDB = () => new Promise(res=>{
-  const req = indexedDB.open("chatDB",1);
-  req.onupgradeneeded = e=>{
-    const d=e.target.result;
-    d.createObjectStore("rooms",{keyPath:"id"});
-    d.createObjectStore("messages",{keyPath:"id"});
-  };
-  req.onsuccess = e=>{ db=e.target.result; res(); };
-});
-const store = (s,m="readonly")=>db.transaction(s,m).objectStore(s);
-
-/* DOM */
+/* DOM 元素 */
+const roomList = document.getElementById("roomList");
+const fab = document.getElementById("fab");
 const addPanel = document.getElementById("addPanel");
 const peerInput = document.getElementById("peerInput");
-const roomList = document.getElementById("roomList");
 const chatView = document.getElementById("chatView");
 const chatTitle = document.getElementById("chatTitle");
 const chatMessages = document.getElementById("chatMessages");
 const msgInput = document.getElementById("msgInput");
-const fab = document.getElementById("fab");
+const closeAddBtn = document.getElementById("closeAddBtn");
+const confirmAddBtn = document.getElementById("confirmAddBtn");
+const closeChatBtn = document.getElementById("closeChatBtn");
+const sendMsgBtn = document.getElementById("sendMsgBtn");
+
+/* WebSocket */
+const ws = new WebSocket("ws://192.168.0.13:3000");
+ws.onopen = () => ws.send(JSON.stringify({ type: "register", userId: myId }));
+ws.onmessage = e => receiveMsg(JSON.parse(e.data));
+
+/* IndexedDB */
+let db, currentRoom;
+const openDB = () => new Promise(res => {
+  const req = indexedDB.open("chatDB", 1);
+  req.onupgradeneeded = e => {
+    const d = e.target.result;
+    d.createObjectStore("rooms", { keyPath: "id" });
+    d.createObjectStore("messages", { keyPath: "id" });
+  };
+  req.onsuccess = e => { db = e.target.result; res(); };
+});
+const store = (s, m="readonly") => db.transaction(s, m).objectStore(s);
 
 /* 新增聊天室 */
-function openAdd(){ addPanel.style.display="flex"; peerInput.value=""; }
-function closeAdd(){ addPanel.style.display="none"; }
-function confirmAdd(){
+function openAdd() {
+  addPanel.style.display = "flex";
+  peerInput.value = "";
+}
+function closeAdd() {
+  addPanel.style.display = "none";
+}
+function confirmAdd() {
+  if (!db) return alert("資料庫尚未初始化");
+
   const peerId = peerInput.value.trim();
-  if(!peerId) return alert("請輸入對方 userId / 名稱");
-  
+  if (!peerId) return alert("請輸入 userId");
+
   const roomId = [myId, peerId].sort().join("_");
-  const room = { id:roomId, peerId: 0d99b747-40d7-448a-9f51-d6447101bd28, title:peerId.slice(0,8), updated:Date.now() };
+
+  const room = {
+    id: roomId,
+    peerId: 0d99b747-40d7-448a-9f51-d6447101bd28,
+    title: peerId.slice(0,8),
+    updated: Date.now()
+  };
+
   store("rooms","readwrite").put(room);
   closeAdd();
   refreshRooms();
 }
 
 /* Rooms */
-function refreshRooms(){
-  roomList.innerHTML="";
-  store("rooms").getAll().onsuccess = e=>{
-    e.target.result.forEach(r=>{
-      const d=document.createElement("div");
-      d.className="room";
-      d.innerHTML=`<div class="room-title">${r.title}</div><div class="room-sub">${new Date(r.updated).toLocaleString()}</div>`;
-      d.onclick=()=>openChat(r);
+function refreshRooms() {
+  roomList.innerHTML = "";
+  store("rooms").getAll().onsuccess = e => {
+    e.target.result.forEach(r => {
+      const d = document.createElement("div");
+      d.className = "room";
+      d.innerHTML = `
+        <div class="room-title">${r.title}</div>
+        <div class="room-sub">${new Date(r.updated).toLocaleString()}</div>
+      `;
+      d.onclick = () => openChat(r);
       roomList.appendChild(d);
     });
   };
 }
 
 /* Chat */
-function openChat(room){
-  currentRoom=room;
-  chatTitle.textContent=room.title;
-  chatView.style.display="flex";
-  roomList.style.display=fab.style.display="none";
+function openChat(room) {
+  currentRoom = room;
+  chatTitle.textContent = room.title;
+  chatView.style.display = "flex";
+  roomList.style.display = fab.style.display = "none";
   renderMessages();
 }
-function closeChat(){
-  chatView.style.display="none";
-  roomList.style.display=fab.style.display="";
+function closeChat() {
+  chatView.style.display = "none";
+  roomList.style.display = fab.style.display = "flex";
   refreshRooms();
 }
 
-/* Send / Receive */
-function sendMsg(){
-  const text=msgInput.innerText.trim();
-  if(!text) return;
+function sendMsg() {
+  const text = msgInput.innerText.trim();
+  if (!text || !currentRoom) return;
 
   const msg = {
-    type:"message",
-    id:genUUID(),
-    roomId:currentRoom.id,
-    from:myId,
-    to:currentRoom.peerId, // <-- 對方 userId
-    content:text,
-    timestamp:Date.now()
+    type: "message",
+    id: genUUID(),
+    roomId: currentRoom.id,
+    from: myId,
+    to: currentRoom.peerId,
+    content: text,
+    timestamp: Date.now()
   };
 
   ws.send(JSON.stringify(msg));
   store("messages","readwrite").put(msg);
-  msgInput.innerHTML="";
+  msgInput.innerHTML = "";
   renderMessages();
 }
 
-function receiveMsg(msg){
+function receiveMsg(msg) {
   store("messages","readwrite").put(msg);
 
   // 若聊天室不存在，自動建立
-  store("rooms").get(msg.roomId).onsuccess=e=>{
-    if(!e.target.result){
+  store("rooms").get(msg.roomId).onsuccess = e => {
+    if (!e.target.result) {
       store("rooms","readwrite").put({
-        id:msg.roomId,
-        peerId:msg.from,
-        title:msg.from.slice(0,8),
-        updated:Date.now()
+        id: msg.roomId,
+        peerId: msg.from,
+        title: msg.from.slice(0,8),
+        updated: Date.now()
       });
       refreshRooms();
     }
   };
 
-  if(currentRoom && msg.roomId===currentRoom.id) renderMessages();
+  if (currentRoom && msg.roomId === currentRoom.id) {
+    renderMessages();
+  }
 }
 
-/* Render messages */
-function renderMessages(){
-  chatMessages.innerHTML="";
-  store("messages").getAll().onsuccess=e=>{
+function renderMessages() {
+  chatMessages.innerHTML = "";
+  store("messages").getAll().onsuccess = e => {
     e.target.result
-      .filter(m=>m.roomId===currentRoom.id)
+      .filter(m => m.roomId === currentRoom.id)
       .sort((a,b)=>a.timestamp-b.timestamp)
-      .forEach(m=>{
-        const d=document.createElement("div");
-        d.className="msg "+(m.from===myId?"me":"other");
-        d.textContent=m.content;
+      .forEach(m => {
+        const d = document.createElement("div");
+        d.className = "msg " + (m.from === myId ? "me" : "other");
+        d.textContent = m.content;
         chatMessages.appendChild(d);
       });
-    chatMessages.scrollTop=chatMessages.scrollHeight;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
   };
 }
 
+/* 綁定事件 */
+fab.onclick = openAdd;
+closeAddBtn.onclick = closeAdd;
+confirmAddBtn.onclick = confirmAdd;
+closeChatBtn.onclick = closeChat;
+sendMsgBtn.onclick = sendMsg;
+
 /* Init */
-window.onload=async ()=>{
+window.onload = async () => {
   await openDB();
   refreshRooms();
+  fab.style.display = "flex";
+  console.log("你的 userId：", myId);
 };
 </script>
 
