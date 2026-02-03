@@ -3,184 +3,135 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>私密即時聊天</title>
+<title>Firebase 即時聊天</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
 <style>
 body { margin:0; font-family:-apple-system,system-ui; background:#f5f5f5; }
 header { padding:14px; font-size:20px; font-weight:600; background:#4a90e2; color:#fff; }
 #roomList { padding:10px; }
 .room { background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer; }
-.room-title { font-size:16px; font-weight:500; }
-.room-sub { font-size:12px; color:#888; }
-#fab { position:fixed; right:18px; bottom:18px; width:56px; height:56px; border-radius:50%; background:#4a90e2; color:#fff; font-size:32px; display:flex; align-items:center; justify-content:center; }
 #chatView { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
-#chatHeader { padding:12px; background:#4a90e2; color:#fff; display:flex; align-items:center; }
 #chatMessages { flex:1; padding:10px; overflow-y:auto; }
-.msg { max-width:70%; padding:10px; margin:6px 0; border-radius:14px; }
+.msg { max-width:70%; padding:10px; margin:6px; border-radius:14px; }
 .me { background:#4a90e2; color:#fff; margin-left:auto; }
-.other { background:#e5e5ea; color:#000; margin-right:auto; }
+.other { background:#e5e5ea; }
 #chatInput { display:flex; padding:10px; background:#fff; }
-#msgInput { flex:1; border:1px solid #ccc; border-radius:18px; padding:8px 12px; }
-#addPanel { position:fixed; inset:0; background:#f5f5f5; display:none; flex-direction:column; }
+#msgInput { flex:1; padding:10px; }
 </style>
 </head>
 
 <body>
-<header>聊天（即時）</header>
+<header>Firebase 即時聊天</header>
 <div id="roomList"></div>
-<div id="fab">＋</div>
-
-<div id="addPanel">
-  <div style="padding:12px; background:#4a90e2; color:#fff;">
-    <button onclick="closeAdd()">←</button> 新增聊天室
-  </div>
-  <div style="padding:20px;">
-    <input id="peerInput" placeholder="輸入對方 userId" style="width:100%; font-size:16px; padding:10px;" />
-    <button onclick="confirmAdd()" style="margin-top:15px; width:100%; padding:12px;">建立</button>
-  </div>
-</div>
 
 <div id="chatView">
-  <div id="chatHeader">
-    <button onclick="closeChat()">←</button>
-    <span id="chatTitle" style="margin-left:10px;"></span>
-  </div>
+  <button onclick="closeChat()">← 返回</button>
   <div id="chatMessages"></div>
   <div id="chatInput">
-    <div id="msgInput" contenteditable="true"></div>
+    <input id="msgInput" placeholder="輸入訊息" />
     <button onclick="sendMsg()">送出</button>
   </div>
 </div>
 
 <script>
-// ===== UUID =====
-function genUUID(){
-  if (crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
-    const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);
-  });
-}
-
-const myId = localStorage.userId || (localStorage.userId = genUUID());
-console.log("我的 userId:", myId);
-
-// ===== WebSocket =====
-const ws = new WebSocket("ws://192.168.0.13:3000");
-ws.onopen = () => ws.send(JSON.stringify({ type:"register", userId: myId }));
-ws.onmessage = e => receiveMsg(JSON.parse(e.data));
-
-// ===== IndexedDB =====
-let db, currentRoom;
-const openDB = () => new Promise(res=>{
-  const r=indexedDB.open("chatDB",1);
-  r.onupgradeneeded=e=>{
-    const d=e.target.result;
-    d.createObjectStore("rooms",{keyPath:"id"});
-    d.createObjectStore("messages",{keyPath:"id"});
-  };
-  r.onsuccess=e=>{db=e.target.result; res();}
-});
-const store=(s,m="readonly")=>db.transaction(s,m).objectStore(s);
-
-// ===== UI =====
-fab.onclick = () => addPanel.style.display="flex";
-function closeAdd(){ addPanel.style.display="none"; }
-
-// ===== 新增聊天室（手動）=====
-function confirmAdd(){
-  const peerId = peerInput.value.trim();
-  if(!peerId || peerId===myId) return alert("peerId 錯誤");
-  createRoom(peerId).then(room=>{
-    openChat(room);
-    closeAdd();
-  });
-}
-
-// ===== 核心：建立聊天室 =====
-function createRoom(peerId){
-  return new Promise(res=>{
-    const roomId=[myId,peerId].sort().join("_");
-    store("rooms").get(roomId).onsuccess=e=>{
-      if(!e.target.result){
-        const room = { id:roomId, peerId, title:peerId.slice(0,8), updated:Date.now() };
-        store("rooms","readwrite").put(room);
-        refreshRooms();
-        res(room);
-      } else {
-        res(e.target.result);
-      }
-    };
-  });
-}
-
-// ===== Rooms =====
-function refreshRooms(){
-  roomList.innerHTML="";
-  store("rooms").getAll().onsuccess=e=>{
-    e.target.result.forEach(r=>{
-      const d=document.createElement("div");
-      d.className="room";
-      d.innerHTML=`<div class="room-title">${r.title}</div>`;
-      d.onclick=()=>openChat(r);
-      roomList.appendChild(d);
-    });
-  };
-}
-
-// ===== Chat =====
-function openChat(r){
-  currentRoom=r;
-  chatTitle.textContent=r.title;
-  chatView.style.display="flex";
-  renderMessages();
-}
-function closeChat(){ chatView.style.display="none"; }
-
-function sendMsg(){
-  if(!currentRoom) return alert("請先選擇聊天室");
-  const t=msgInput.innerText.trim();
-  if(!t) return;
-
-  const peerId = currentRoom.peerId;
-  if(!peerId) return alert("peerId 非法，拒絕送出");
-
-  const m={type:"message",id:genUUID(),roomId:currentRoom.id,from:myId,to:peerId,content:t,timestamp:Date.now()};
-  ws.send(JSON.stringify(m));
-  store("messages","readwrite").put(m);
-  msgInput.innerHTML="";
-  renderMessages();
-}
-
-function receiveMsg(m){
-  store("messages","readwrite").put(m);
-  createRoom(m.from).then(room=>{
-    if(currentRoom && m.roomId===currentRoom.id) renderMessages();
-  });
-}
-
-function renderMessages(){
-  chatMessages.innerHTML="";
-  store("messages").getAll().onsuccess=e=>{
-    e.target.result.filter(m=>m.roomId===currentRoom?.id)
-      .forEach(m=>{
-        const d=document.createElement("div");
-        d.className="msg "+(m.from===myId?"me":"other");
-        d.textContent=m.content;
-        chatMessages.appendChild(d);
-      });
-  };
-}
-
-// ===== Init：手機自動連桌機 =====
-window.onload=async()=>{
-  await openDB();
-  refreshRooms();
-
-  const DESKTOP_ID="cf4d963b-eb62-44cd-aa4d-368a4ac5220e";
-  if(myId!==DESKTOP_ID){
-    const room = await createRoom(DESKTOP_ID);  // 建立房間
-    openChat(room);  // 打開聊天室，currentRoom.peerId就是桌機 UUID
-  }
+/* ========= Firebase ========= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAqrxYREvkIor__6RrI_JrdP94jkfmw05M",
+  authDomain: "multi-party-chat.firebaseapp.com",
+  databaseURL: "https://multi-party-chat-default-rtdb.firebaseio.com",
+  projectId: "multi-party-chat"
 };
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+const auth = firebase.auth();
+
+/* ========= State ========= */
+let myId = null;
+let currentRoomId = null;
+
+/* ========= Auth ========= */
+auth.signInAnonymously().then(res => {
+  myId = res.user.uid;
+  init();
+});
+
+/* ========= Init ========= */
+function init(){
+  ensurePublicRoom();
+  loadRooms();
+}
+
+/* ========= Rooms ========= */
+function ensurePublicRoom(){
+  const roomRef = db.ref("rooms/public");
+  roomRef.once("value", snap=>{
+    if(!snap.exists()){
+      roomRef.set({
+        title: "公開聊天室",
+        members: {}
+      });
+    }
+  });
+
+  roomRef.child("members/"+myId).set(true);
+}
+
+function loadRooms(){
+  db.ref("rooms").on("value", snap=>{
+    roomList.innerHTML="";
+    snap.forEach(room=>{
+      const data = room.val();
+      const div = document.createElement("div");
+      div.className="room";
+      div.textContent = data.title || room.key;
+      div.onclick = ()=>openRoom(room.key, data.title);
+      roomList.appendChild(div);
+    });
+  });
+}
+
+function openRoom(roomId, title){
+  currentRoomId = roomId;
+  chatMessages.innerHTML="";
+  chatView.style.display="flex";
+  listenMessages(roomId);
+}
+
+/* ========= Chat ========= */
+function sendMsg(){
+  const text = msgInput.value.trim();
+  if(!text || !currentRoomId) return;
+
+  db.ref("messages/"+currentRoomId).push({
+    from: myId,
+    text,
+    time: Date.now()
+  });
+
+  msgInput.value="";
+}
+
+function listenMessages(roomId){
+  db.ref("messages/"+roomId).off();
+  db.ref("messages/"+roomId).on("child_added", snap=>{
+    const m = snap.val();
+    const d = document.createElement("div");
+    d.className="msg "+(m.from===myId?"me":"other");
+    d.textContent = m.text;
+    chatMessages.appendChild(d);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
+
+function closeChat(){
+  chatView.style.display="none";
+  currentRoomId = null;
+}
 </script>
 </body>
 </html>
